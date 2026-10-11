@@ -56,7 +56,7 @@ BulkCarrier::BulkCarrier(std::uint64_t id, const ShipSpec& spec, int actual_arri
            spec.planned_stay_days, spec.max_wait_days, unloading_delay_days,
            std::make_unique<GrainCargo>(spec.cargo_weight_tons)) {}
 
-std::string BulkCarrier::ship_type_name() const { return "сухогруз"; }
+std::string BulkCarrier::ship_type_name() const { return "bulk"; }
 CargoType BulkCarrier::supported_cargo_type() const { return CargoType::kBulk; }
 
 Tanker::Tanker(std::uint64_t id, const ShipSpec& spec, int actual_arrival_day,
@@ -65,7 +65,7 @@ Tanker::Tanker(std::uint64_t id, const ShipSpec& spec, int actual_arrival_day,
            spec.planned_stay_days, spec.max_wait_days, unloading_delay_days,
            std::make_unique<OilCargo>(spec.cargo_weight_tons)) {}
 
-std::string Tanker::ship_type_name() const { return "танкер"; }
+std::string Tanker::ship_type_name() const { return "tanker"; }
 CargoType Tanker::supported_cargo_type() const { return CargoType::kLiquid; }
 
 ContainerShip::ContainerShip(std::uint64_t id, const ShipSpec& spec, int actual_arrival_day,
@@ -74,7 +74,7 @@ ContainerShip::ContainerShip(std::uint64_t id, const ShipSpec& spec, int actual_
            spec.planned_stay_days, spec.max_wait_days, unloading_delay_days,
            std::make_unique<ContainerCargo>(spec.cargo_weight_tons)) {}
 
-std::string ContainerShip::ship_type_name() const { return "контейнеровоз"; }
+std::string ContainerShip::ship_type_name() const { return "container"; }
 CargoType ContainerShip::supported_cargo_type() const { return CargoType::kContainer; }
 
 std::unique_ptr<Ship> CreateShip(std::uint64_t id, const ShipSpec& spec, int actual_arrival_day,

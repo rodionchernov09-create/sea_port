@@ -45,14 +45,14 @@ void Crane::Release() { assigned_ship_id_.reset(); }
 
 BulkCrane::BulkCrane(std::uint64_t id, std::string name)
     : Crane(id, std::move(name), CargoType::kBulk, kBulkThroughput) {}
-std::string BulkCrane::crane_type_name() const { return "кран для сыпучих грузов"; }
+std::string BulkCrane::crane_type_name() const { return "bulk cargo crane"; }
 
 LiquidCrane::LiquidCrane(std::uint64_t id, std::string name)
     : Crane(id, std::move(name), CargoType::kLiquid, kLiquidThroughput) {}
-std::string LiquidCrane::crane_type_name() const { return "кран для жидких грузов"; }
+std::string LiquidCrane::crane_type_name() const { return "liquid cargo crane"; }
 
 ContainerCrane::ContainerCrane(std::uint64_t id, std::string name)
     : Crane(id, std::move(name), CargoType::kContainer, kContainerThroughput) {}
-std::string ContainerCrane::crane_type_name() const { return "контейнерный кран"; }
+std::string ContainerCrane::crane_type_name() const { return "container crane"; }
 
 }  // namespace sea_port

@@ -7,11 +7,11 @@ namespace sea_port {
 std::string ToString(CargoType type) {
   switch (type) {
     case CargoType::kBulk:
-      return "сыпучий";
+      return "bulk";
     case CargoType::kLiquid:
-      return "жидкий";
+      return "liquid";
     case CargoType::kContainer:
-      return "контейнерный";
+      return "container";
     case CargoType::kCount:
       break;
   }
@@ -21,13 +21,13 @@ std::string ToString(CargoType type) {
 std::string ToString(Season season) {
   switch (season) {
     case Season::kWinter:
-      return "зима";
+      return "winter";
     case Season::kSpring:
-      return "весна";
+      return "spring";
     case Season::kSummer:
-      return "лето";
+      return "summer";
     case Season::kAutumn:
-      return "осень";
+      return "autumn";
   }
   throw std::invalid_argument("Unknown season");
 }

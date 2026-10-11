@@ -172,72 +172,112 @@ int main() {
       ImGui::BeginChild("Simulation", ImVec2(0, 0), true);
 
       ImGui::Text("QUEUES");
+      ImGui::Text("DAY %d / %d",
+            simulation ? simulation->current_day() - 1 : 0,
+            simulation ? simulation->config().simulation_days : 30);
+
       ImGui::Separator();
 
-      ImGui::Spacing();
-      ImGui::Spacing();
+      if (hasReport)
+      {
+        ImGui::Text("Arrived: %d", lastReport.arrived);
+        ImGui::Text("Started unloading: %d", lastReport.started_unloading);
+        ImGui::Text("Completed: %d", lastReport.completed);
+        ImGui::Text("Waiting: %zu", lastReport.waiting);
+        ImGui::Text("Unloading: %zu", lastReport.unloading);
 
-      ImGui::Text("SHIPS");
-      ImGui::Separator();
+        ImGui::Spacing();
+        ImGui::Text("QUEUES BY CARGO TYPE");
 
-      ImGui::Text("Arrivals:");
+        for (int i = 0; i < 3; ++i)
+        {
+          ImGui::Text("Type %d:", i + 1);
 
-      ImGui::Spacing();
-      ImGui::Spacing();
+          for (const auto& ship : lastReport.queues[i])
+            ImGui::BulletText("%s", ship.c_str());
+        }
+
+        ImGui::Spacing();
+        ImGui::Text("ACTIVE OPERATIONS");
+
+        for (const auto& operation : lastReport.active_operations)
+          ImGui::BulletText("%s", operation.c_str());
+
+        ImGui::Spacing();
+        ImGui::Text("EVENTS");
+
+        for (const auto& event : lastReport.events)
+          ImGui::BulletText("%s", event.c_str());
+      }
+      else
+      {
+        ImGui::Text("Press STEP or RUN to start.");
+      }
 
       ImGui::Text("COMPLETED UNLOADINGS");
-      ImGui::Separator();
+      if (simulation)
+      {
+        const auto& records = simulation->statistics().completions();
 
-      ImGui::Columns(5, "Unloadings");
+        ImGui::Columns(5, "Unloadings");
 
-      ImGui::Text("Ship");
-      ImGui::NextColumn();
+        ImGui::Text("Ship");
+        ImGui::NextColumn();
+        ImGui::Text("Arrival");
+        ImGui::NextColumn();
+        ImGui::Text("Waiting");
+        ImGui::NextColumn();
+        ImGui::Text("Start");
+        ImGui::NextColumn();
+        ImGui::Text("Duration");
+        ImGui::NextColumn();
 
-      ImGui::Text("Arrival");
-      ImGui::NextColumn();
+        ImGui::Separator();
 
-      ImGui::Text("Waiting");
-      ImGui::NextColumn();
+        for (const auto& record : records)
+        {
+          ImGui::Text("%s", record.ship_name.c_str());
+          ImGui::NextColumn();
 
-      ImGui::Text("Start");
-      ImGui::NextColumn();
+          ImGui::Text("%d", record.actual_arrival_day);
+          ImGui::NextColumn();
 
-      ImGui::Text("Duration");
-      ImGui::NextColumn();
+          ImGui::Text("%d days", record.waiting_days);
+          ImGui::NextColumn();
 
-      ImGui::Separator();
+          ImGui::Text("%d", record.unloading_start_day);
+          ImGui::NextColumn();
 
-      ImGui::Columns(1);
+          ImGui::Text("%d days", record.unloading_duration_days);
+          ImGui::NextColumn();
+        }
+
+        ImGui::Columns(1);
+      }
 
       ImGui::Spacing();
       ImGui::Spacing();
 
       if (ImGui::Button("STEP", ImVec2(100, 40)))
-      {
-        if (!simulationFinished)
-          advanceRequested = true;
-      }
+        advanceRequested = true;
 
       ImGui::SameLine();
 
       if (ImGui::Button("RUN", ImVec2(100, 40)))
       {
         isRunning = true;
+        lastStepTime = 0.0;
       }
 
       ImGui::SameLine();
 
       if (ImGui::Button("STOP", ImVec2(100, 40)))
-      {
         isRunning = false;
-      }
 
       ImGui::SameLine();
 
       if (ImGui::Button("FINISH SIMULATION", ImVec2(200, 40)))
-      {
         finishRequested = true;
-      }
 
       ImGui::EndChild();
     }
@@ -249,12 +289,41 @@ int main() {
 
       ImGui::BeginChild("Statistics", ImVec2(0, 250), true);
 
-      ImGui::Text("Unloaded ships: ");
-      ImGui::Text("Average queue length: ");
-      ImGui::Text("Average waiting time: ");
-      ImGui::Text("Maximum unloading delay: ");
-      ImGui::Text("Average unloading delay: ");
-      ImGui::Text("Total penalty: ");
+      if (simulation)
+      {
+        const auto& stats = simulation->statistics();
+
+        ImGui::Text("Arrived ships: %d", stats.arrived_ships());
+        ImGui::Text("Completed ships: %d", stats.completed_ships());
+        ImGui::Text("Abandoned ships: %d", stats.abandoned_ships());
+        ImGui::Text("Rejected ships: %d", stats.rejected_ships());
+
+        ImGui::Separator();
+
+        ImGui::Text("Average queue length: %.2f",
+                    stats.average_queue_length());
+
+        ImGui::Text("Average waiting time: %.2f days",
+                    stats.average_waiting_days());
+
+        ImGui::Text("Maximum waiting time: %d days",
+                    stats.maximum_waiting_days());
+
+        ImGui::Text("Average unloading delay: %.2f days",
+                    stats.average_unloading_delay_days());
+
+        ImGui::Text("Maximum unloading delay: %d days",
+                    stats.maximum_unloading_delay_days());
+
+        ImGui::Text("Total penalties: %.2f",
+                    stats.total_penalties());
+
+        ImGui::Text("Net revenue: %.2f",
+                    stats.net_revenue());
+
+        ImGui::Text("Unfinished ships: %zu",
+                    stats.unfinished_ships());
+      }
 
       ImGui::EndChild();
     }

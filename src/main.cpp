@@ -29,7 +29,7 @@ int ReadInt(const std::string& prompt, int minimum, int maximum, int default_val
     std::cout << prompt << " [" << default_value << "]: ";
     std::string line;
     if (!std::getline(std::cin, line)) {
-      throw std::runtime_error("Ввод завершён");
+      throw std::runtime_error("input is forbidden");
     }
     if (line.empty()) {
       return default_value;
@@ -40,7 +40,7 @@ int ReadInt(const std::string& prompt, int minimum, int maximum, int default_val
     if ((input >> value) && !(input >> remainder) && value >= minimum && value <= maximum) {
       return value;
     }
-    std::cout << "Введите целое число от " << minimum << " до " << maximum << ".\n";
+    std::cout << "input number between " << minimum << " and " << maximum << ".\n";
   }
 }
 
@@ -51,7 +51,7 @@ double ReadDouble(const std::string& prompt, double minimum,
     std::cout << prompt << " [" << default_value << "]: ";
     std::string line;
     if (!std::getline(std::cin, line)) {
-      throw std::runtime_error("Ввод завершён");
+      throw std::runtime_error("input is forbidden");
     }
     if (line.empty()) {
       return default_value;
@@ -62,7 +62,7 @@ double ReadDouble(const std::string& prompt, double minimum,
     if ((input >> value) && !(input >> remainder) && value >= minimum && value <= maximum) {
       return value;
     }
-    std::cout << "Введите число в допустимом диапазоне.\n";
+    std::cout << "input number in allowed range\n";
   }
 }
 
@@ -70,38 +70,38 @@ std::string ReadString(const std::string& prompt, const std::string& default_val
   std::cout << prompt << " [" << default_value << "]: ";
   std::string value;
   if (!std::getline(std::cin, value)) {
-    throw std::runtime_error("Ввод завершён");
+    throw std::runtime_error("input is forbidden");
   }
   return value.empty() ? default_value : value;
 }
 
 Season ReadSeason() {
-  const int value = ReadInt("Время года: 1 — зима, 2 — весна, 3 — лето, 4 — осень", 1, 4, 3);
+  const int value = ReadInt("Season: 1 — winter, 2 — spring, 3 — summer, 4 — autumn", 1, 4, 3);
   return static_cast<Season>(value - 1);
 }
 
 CargoType ReadCargoType() {
-  const int value = ReadInt("Тип: 1 — сухогруз, 2 — танкер, 3 — контейнеровоз", 1, 3, 1);
+  const int value = ReadInt("Type: 1 — dry-cargo ship, 2 — tanker, 3 — container ship", 1, 3, 1);
   return static_cast<CargoType>(value - 1);
 }
 
 void PrintDailyReport(const DailyReport& report, int step_days) {
-  std::cout << "\nДень " << report.day << ": волны " << report.weather.wave_level
-            << "/5, работоспособность " << std::fixed << std::setprecision(0)
+  std::cout << "\nDay " << report.day << ": waves " << report.weather.wave_level
+            << "/5, efficiency " << std::fixed << std::setprecision(0)
             << report.weather.operability * 100.0 << "%\n";
   for (const std::string& event : report.events) {
     std::cout << "  - " << event << '\n';
   }
-  std::cout << "  Прибыло: " << report.arrived << ", начало разгрузки: " << report.started_unloading
-            << ", завершено: " << report.completed << ", ушло: " << report.abandoned
-            << ", отказано: " << report.rejected << '\n'
-            << "  В очередях: " << report.waiting << ", разгружается: " << report.unloading
-            << ", результат дня: " << std::setprecision(2) << report.daily_net_revenue
-            << " у.е., рейтинг: " << report.rating << '\n';
+  std::cout << "  Arrived: " << report.arrived << ", begin of unloading: " << report.started_unloading
+            << ", completed: " << report.completed << ", gone: " << report.abandoned
+            << ", rejected: " << report.rejected << '\n'
+            << "  In queue: " << report.waiting << ", unloading: " << report.unloading
+            << ", day result: " << std::setprecision(2) << report.daily_net_revenue
+            << " у.е., rating: " << report.rating << '\n';
   for (std::size_t index = 0; index < sea_port::kCargoTypeCount; ++index) {
-    std::cout << "  Очередь «" << sea_port::ToString(static_cast<CargoType>(index)) << "»: ";
+    std::cout << "  Queue «" << sea_port::ToString(static_cast<CargoType>(index)) << "»: ";
     if (report.queues[index].empty()) {
-      std::cout << "пусто";
+      std::cout << "empty";
     } else {
       for (std::size_t ship_index = 0; ship_index < report.queues[index].size(); ++ship_index) {
         std::cout << (ship_index == 0 ? "" : ", ") << report.queues[index][ship_index];
@@ -110,7 +110,7 @@ void PrintDailyReport(const DailyReport& report, int step_days) {
     std::cout << '\n';
   }
   if (!report.active_operations.empty()) {
-    std::cout << "  Активные операции: ";
+    std::cout << "  Active operations: ";
     for (std::size_t index = 0; index < report.active_operations.size(); ++index) {
       std::cout << (index == 0 ? "" : ", ") << report.active_operations[index];
     }

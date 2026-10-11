@@ -29,19 +29,19 @@ GrainCargo::GrainCargo(double weight_tons) : Cargo(weight_tons, kGrainRevenuePer
 
 CargoType GrainCargo::type() const { return CargoType::kBulk; }
 
-std::string GrainCargo::name() const { return "зерно"; }
+std::string GrainCargo::name() const { return "grain"; }
 
 OilCargo::OilCargo(double weight_tons) : Cargo(weight_tons, kOilRevenuePerTon) {}
 
 CargoType OilCargo::type() const { return CargoType::kLiquid; }
 
-std::string OilCargo::name() const { return "нефть"; }
+std::string OilCargo::name() const { return "oil"; }
 
 ContainerCargo::ContainerCargo(double weight_tons) : Cargo(weight_tons, kContainerRevenuePerTon) {}
 
 CargoType ContainerCargo::type() const { return CargoType::kContainer; }
 
-std::string ContainerCargo::name() const { return "контейнеры"; }
+std::string ContainerCargo::name() const { return "containers"; }
 
 std::unique_ptr<Cargo> CreateCargo(CargoType type, double weight_tons) {
   switch (type) {
