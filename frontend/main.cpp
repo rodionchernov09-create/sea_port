@@ -3,6 +3,10 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "sea_port/port_simulation.h"
+#include "sea_port/types.h"
+
+#include <memory>
 
 int main() {
   // Create window
@@ -38,7 +42,13 @@ int main() {
   // Simulation state
   bool simulationStarted = false;
   bool simulationFinished = false;
+  std::unique_ptr<sea_port::PortSimulation> simulation;
 
+  sea_port::DailyReport lastReport;
+  bool hasReport = false;
+  bool isRunning = false;
+
+  double lastStepTime = 0.0;
   // Settings
   int cranesType1 = 2;
   int cranesType2 = 3;
@@ -54,7 +64,8 @@ int main() {
 
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
-
+    bool advanceRequested = false;
+    bool finishRequested = false;
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -109,7 +120,28 @@ int main() {
       ImGui::Spacing();
 
       if (ImGui::Button("START SIMULATION", ImVec2(250, 50))) {
+        sea_port::SimulationConfig config;
+
+        config.crane_counts = {
+          cranesType1,
+          cranesType2,
+          cranesType3
+      };
+
+        config.arrival_deviation_min_days = arrivalMin;
+        config.arrival_deviation_max_days = arrivalMax;
+
+        config.unloading_delay_min_days = unloadingMin;
+        config.unloading_delay_max_days = unloadingMax;
+
+        config.step_days = simulationStep;
+
+        simulation = std::make_unique<sea_port::PortSimulation>(config);
+
         simulationStarted = true;
+        simulationFinished = false;
+        hasReport = false;
+        isRunning = false;
       }
 
       ImGui::EndChild();
@@ -180,26 +212,31 @@ int main() {
       ImGui::Spacing();
       ImGui::Spacing();
 
-      if (ImGui::Button("STEP", ImVec2(100, 40))) {
-        // One simulation step
+      if (ImGui::Button("STEP", ImVec2(100, 40)))
+      {
+        if (!simulationFinished)
+          advanceRequested = true;
       }
 
       ImGui::SameLine();
 
-      if (ImGui::Button("RUN", ImVec2(100, 40))) {
-        // Run simulation
+      if (ImGui::Button("RUN", ImVec2(100, 40)))
+      {
+        isRunning = true;
       }
 
       ImGui::SameLine();
 
-      if (ImGui::Button("STOP", ImVec2(100, 40))) {
-        // Stop simulation
+      if (ImGui::Button("STOP", ImVec2(100, 40)))
+      {
+        isRunning = false;
       }
 
       ImGui::SameLine();
 
-      if (ImGui::Button("FINISH SIMULATION", ImVec2(200, 40))) {
-        simulationFinished = true;
+      if (ImGui::Button("FINISH SIMULATION", ImVec2(200, 40)))
+      {
+        finishRequested = true;
       }
 
       ImGui::EndChild();
@@ -223,7 +260,49 @@ int main() {
     }
 
     ImGui::End();
+    // Advance simulation
+    if (simulation && !simulationFinished)
+    {
+      if (finishRequested)
+      {
+        while (simulation->current_day() <=
+               simulation->config().simulation_days)
+        {
+          simulation->GenerateRandomParametersForDay(
+              simulation->current_day(), 7);
 
+          lastReport = simulation->SimulateDay();
+          hasReport = true;
+        }
+
+        simulation->Finalize();
+        simulationFinished = true;
+        isRunning = false;
+      }
+      else if (advanceRequested ||
+               (isRunning && glfwGetTime() - lastStepTime >= 0.5))
+      {
+        if (simulation->current_day() <=
+            simulation->config().simulation_days)
+        {
+          simulation->GenerateRandomParametersForDay(
+              simulation->current_day(), 7);
+
+          lastReport = simulation->SimulateDay();
+          hasReport = true;
+
+          lastStepTime = glfwGetTime();
+        }
+
+        if (simulation->current_day() >
+            simulation->config().simulation_days)
+        {
+          simulation->Finalize();
+          simulationFinished = true;
+          isRunning = false;
+        }
+      }
+    }
     // Render
     ImGui::Render();
 

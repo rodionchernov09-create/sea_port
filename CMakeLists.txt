@@ -44,9 +44,6 @@ target_link_libraries(sea_port PRIVATE
         sea_port_lib
 )
 
-# =========================
-# FRONTEND — Dear ImGui
-# =========================
 
 find_package(OpenGL REQUIRED)
 find_package(glfw3 REQUIRED)
@@ -71,4 +68,5 @@ target_include_directories(sea_port_gui PRIVATE
 target_link_libraries(sea_port_gui PRIVATE
         glfw
         OpenGL::GL
+        sea_port_lib
 )
