@@ -151,9 +151,9 @@ DailyReport PortSimulation::SimulateDay() {
   report.unloading = active_unloadings_.size();
   for (std::size_t type_index = 0; type_index < kCargoTypeCount; ++type_index) {
     queues_[type_index].ForEach([this, &report, type_index](const Ship& ship) {
-      report.queues[type_index].push_back(ship.name() + " (ожидает " +
+      report.queues[type_index].push_back(ship.name() + " (waiting " +
                                           std::to_string(current_day_ - ship.actual_arrival_day()) +
-                                          " дн.)");
+                                          " days)");
     });
   }
   for (const auto& unloading : active_unloadings_) {
@@ -192,12 +192,12 @@ void PortSimulation::ProcessArrivals(DailyReport& report) {
       statistics_.RecordRejection();
       ++report.rejected;
       AdjustRating(kRatingLossForRejection);
-      report.events.push_back(ShipLabel(*ship) + ": отказано — нет места ожидания");
+      report.events.push_back(ShipLabel(*ship) + ": rejected — no waiting place");
       continue;
     }
 
     ship->set_state(ShipState::kWaiting);
-    report.events.push_back(ShipLabel(*ship) + ": прибыл в порт");
+    report.events.push_back(ShipLabel(*ship) + ": arrived");
     queues_[CargoIndex(ship->cargo().type())].Push(std::move(ship));
   }
 }
@@ -212,7 +212,7 @@ void PortSimulation::ProcessAbandonments(DailyReport& report) {
       statistics_.RecordAbandonment();
       ++report.abandoned;
       AdjustRating(kRatingLossForAbandonment);
-      report.events.push_back(ShipLabel(*ship) + ": ушёл, не дождавшись разгрузки");
+      report.events.push_back(ShipLabel(*ship) + ": gone before unloading");
     }
   }
 }
@@ -232,7 +232,7 @@ void PortSimulation::AssignWaitingShips(DailyReport& report) {
       ship->set_state(ShipState::kUnloading);
       ship->set_unloading_start_day(current_day_);
       crane->Assign(ship->id());
-      report.events.push_back(ShipLabel(*ship) + ": начата разгрузка краном " + crane->name());
+      report.events.push_back(ShipLabel(*ship) + ": unloading began by crane " + crane->name());
       active_unloadings_.push_back(ActiveUnloading{.ship = std::move(ship),
                                                    .crane = crane,
                                                    .start_day = current_day_,
@@ -282,8 +282,8 @@ void PortSimulation::ProcessUnloading(const Weather& weather, DailyReport& repor
     } else if (record.waiting_days <= 2) {
       AdjustRating(0.3);
     }
-    report.events.push_back(record.ship_name + ": разгрузка завершена, результат " +
-                            std::to_string(static_cast<long long>(record.net_revenue)) + " у.е.");
+    report.events.push_back(record.ship_name + ": unloading completed, result " +
+                            std::to_string(static_cast<long long>(record.net_revenue)) + " $");
     active_unloadings_.erase(active_unloadings_.begin() + static_cast<std::ptrdiff_t>(index));
   }
 }

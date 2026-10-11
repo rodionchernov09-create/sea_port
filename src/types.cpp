@@ -35,17 +35,17 @@ std::string ToString(Season season) {
 std::string ToString(ShipState state) {
   switch (state) {
     case ShipState::kScheduled:
-      return "запланирован";
+      return "sceduled";
     case ShipState::kWaiting:
-      return "ожидает";
+      return "waiting";
     case ShipState::kUnloading:
-      return "разгружается";
+      return "unloading";
     case ShipState::kCompleted:
-      return "разгружен";
+      return "completed";
     case ShipState::kAbandoned:
-      return "ушёл";
+      return "gone";
     case ShipState::kRejected:
-      return "не принят";
+      return "rejected";
   }
   throw std::invalid_argument("Unknown ship state");
 }

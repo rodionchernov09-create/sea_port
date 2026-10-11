@@ -174,15 +174,15 @@ void AddManualShips(PortSimulation& simulation, int day) {
   for (int number = 1; number <= count; ++number) {
     ShipSpec spec;
     spec.cargo_type = ReadCargoType();
-    spec.name = ReadString("Название корабля",
+    spec.name = ReadString("Ship name",
                            "MANUAL-" + std::to_string(day) + "-" + std::to_string(number));
     spec.booking_day = day;
     const int maximum_offset = std::min(6, simulation.config().simulation_days - day);
-    const int offset = ReadInt("Через сколько дней ожидается прибытие", 0, maximum_offset, 0);
+    const int offset = ReadInt("Days to arrival", 0, maximum_offset, 0);
     spec.planned_arrival_day = day + offset;
-    spec.cargo_weight_tons = ReadDouble("Масса груза, тонн", 1.0, 100000.0, 2000.0);
-    spec.planned_stay_days = ReadInt("Плановый срок стоянки", 1, 30, 4);
-    spec.max_wait_days = ReadInt("Максимальное ожидание", 0, 30, 6);
+    spec.cargo_weight_tons = ReadDouble("cargo weight, tons", 1.0, 100000.0, 2000.0);
+    spec.planned_stay_days = ReadInt("Planed duration of stay", 1, 30, 4);
+    spec.max_wait_days = ReadInt("max waiting", 0, 30, 6);
     simulation.ScheduleShip(spec);
   }
 }
@@ -237,7 +237,7 @@ void RunOptimizer(const SimulationConfig& config) {
               << std::setw(13) << item.average_operating_profit << " | " << std::setw(13)
               << item.average_investment_profit << " | " << std::setw(7) << std::setprecision(1)
               << item.average_rating << " | " << std::setw(9) << item.average_service_rate * 100.0
-              << "% | " << std::setw(10) << std::setprecision(2) << item.payback_months << " мес."
+              << "% | " << std::setw(10) << std::setprecision(2) << item.payback_months << " months"
               << (item.meets_quality_limits ? "" : "  [не прошёл ограничения]") << '\n';
   }
 
@@ -257,9 +257,9 @@ void RunOptimizer(const SimulationConfig& config) {
 }
 
 void PrintHelp(const char* executable) {
-  std::cout << "Использование:\n"
-            << "  " << executable << "             интерактивная симуляция\n"
-            << "  " << executable << " --auto      автоматическая симуляция\n"
+  std::cout << "Usage:\n"
+            << "  " << executable << "             interactive simulation\n"
+            << "  " << executable << " --auto      automatic simulation\n"
             << "  " << executable << " --optimize  подбор кранов\n"
             << "Дополнительно: --seed N задаёт генератор случайных чисел.\n";
 }
@@ -283,7 +283,7 @@ int main(int argc, char* argv[]) {
         PrintHelp(argv[0]);
         return 0;
       } else {
-        throw std::invalid_argument("Неизвестный аргумент: " + argument);
+        throw std::invalid_argument("Unknown argument: " + argument);
       }
     }
 
@@ -295,7 +295,7 @@ int main(int argc, char* argv[]) {
       RunInteractive();
     }
   } catch (const std::exception& error) {
-    std::cerr << "Ошибка: " << error.what() << '\n';
+    std::cerr << "error: " << error.what() << '\n';
     return 1;
   }
   return 0;

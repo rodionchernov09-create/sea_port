@@ -1,12 +1,12 @@
 #include <GLFW/glfw3.h>
 
+#include <memory>
+
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "sea_port/port_simulation.h"
 #include "sea_port/types.h"
-
-#include <memory>
 
 int main() {
   // Create window
@@ -14,7 +14,10 @@ int main() {
 
   GLFWwindow* window = glfwCreateWindow(1400, 900, "Sea Port", nullptr, nullptr);
 
-  if (!window) return 1;
+  if (!window) {
+    glfwTerminate();
+    return 1;
+  }
 
   glfwMakeContextCurrent(window);
   glfwSwapInterval(1);
@@ -49,6 +52,7 @@ int main() {
   bool isRunning = false;
 
   double lastStepTime = 0.0;
+
   // Settings
   int cranesType1 = 2;
   int cranesType2 = 3;
@@ -64,8 +68,10 @@ int main() {
 
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
+
     bool advanceRequested = false;
     bool finishRequested = false;
+
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -89,7 +95,6 @@ int main() {
       ImGui::Text("SETTINGS");
       ImGui::Spacing();
 
-      // Large settings window
       ImGui::BeginChild("Settings", ImVec2(0, 0), true);
 
       ImGui::Text("Number of cranes");
@@ -112,21 +117,32 @@ int main() {
       ImGui::Spacing();
 
       ImGui::Text("Simulation step");
-      ImGui::InputInt("Days", &simulationStep);
-
-      if (simulationStep < 1) simulationStep = 1;
+      ImGui::SliderInt("Days", &simulationStep, 1, 3);
 
       ImGui::Spacing();
       ImGui::Spacing();
 
       if (ImGui::Button("START SIMULATION", ImVec2(250, 50))) {
+        // Validate settings
+        cranesType1 = cranesType1 < 0 ? 0 : cranesType1;
+        cranesType2 = cranesType2 < 0 ? 0 : cranesType2;
+        cranesType3 = cranesType3 < 0 ? 0 : cranesType3;
+
+        if (arrivalMin > arrivalMax) {
+          int temp = arrivalMin;
+          arrivalMin = arrivalMax;
+          arrivalMax = temp;
+        }
+
+        if (unloadingMin > unloadingMax) {
+          int temp = unloadingMin;
+          unloadingMin = unloadingMax;
+          unloadingMax = temp;
+        }
+
         sea_port::SimulationConfig config;
 
-        config.crane_counts = {
-          cranesType1,
-          cranesType2,
-          cranesType3
-      };
+        config.crane_counts = {cranesType1, cranesType2, cranesType3};
 
         config.arrival_deviation_min_days = arrivalMin;
         config.arrival_deviation_max_days = arrivalMax;
@@ -142,6 +158,7 @@ int main() {
         simulationFinished = false;
         hasReport = false;
         isRunning = false;
+        lastStepTime = glfwGetTime();
       }
 
       ImGui::EndChild();
@@ -149,7 +166,6 @@ int main() {
 
     // Simulation
     if (simulationStarted) {
-      // Small settings
       ImGui::Text("SETTINGS");
 
       ImGui::BeginChild("SmallSettings", ImVec2(0, 120), true);
@@ -165,21 +181,18 @@ int main() {
       ImGui::EndChild();
 
       ImGui::Spacing();
-
       ImGui::Text("SIMULATION");
 
-      // Simulation window
-      ImGui::BeginChild("Simulation", ImVec2(0, 0), true);
+      ImGui::BeginChild("Simulation", ImVec2(0, simulationFinished ? 300 : 0), true);
 
       ImGui::Text("QUEUES");
-      ImGui::Text("DAY %d / %d",
-            simulation ? simulation->current_day() - 1 : 0,
-            simulation ? simulation->config().simulation_days : 30);
+
+      ImGui::Text("DAY %d / %d", simulation ? simulation->current_day() - 1 : 0,
+                  simulation ? simulation->config().simulation_days : 30);
 
       ImGui::Separator();
 
-      if (hasReport)
-      {
+      if (hasReport) {
         ImGui::Text("Arrived: %d", lastReport.arrived);
         ImGui::Text("Started unloading: %d", lastReport.started_unloading);
         ImGui::Text("Completed: %d", lastReport.completed);
@@ -189,53 +202,58 @@ int main() {
         ImGui::Spacing();
         ImGui::Text("QUEUES BY CARGO TYPE");
 
-        for (int i = 0; i < 3; ++i)
-        {
+        for (int i = 0; i < 3; ++i) {
           ImGui::Text("Type %d:", i + 1);
 
-          for (const auto& ship : lastReport.queues[i])
+          for (const auto& ship : lastReport.queues[i]) {
             ImGui::BulletText("%s", ship.c_str());
+          }
         }
 
         ImGui::Spacing();
         ImGui::Text("ACTIVE OPERATIONS");
 
-        for (const auto& operation : lastReport.active_operations)
+        for (const auto& operation : lastReport.active_operations) {
           ImGui::BulletText("%s", operation.c_str());
+        }
 
         ImGui::Spacing();
         ImGui::Text("EVENTS");
 
-        for (const auto& event : lastReport.events)
+        for (const auto& event : lastReport.events) {
           ImGui::BulletText("%s", event.c_str());
-      }
-      else
-      {
+        }
+      } else {
         ImGui::Text("Press STEP or RUN to start.");
       }
 
+      // Completed unloadings
+      ImGui::Spacing();
       ImGui::Text("COMPLETED UNLOADINGS");
-      if (simulation)
-      {
+
+      if (simulation) {
         const auto& records = simulation->statistics().completions();
 
         ImGui::Columns(5, "Unloadings");
 
         ImGui::Text("Ship");
         ImGui::NextColumn();
+
         ImGui::Text("Arrival");
         ImGui::NextColumn();
+
         ImGui::Text("Waiting");
         ImGui::NextColumn();
+
         ImGui::Text("Start");
         ImGui::NextColumn();
+
         ImGui::Text("Duration");
         ImGui::NextColumn();
 
         ImGui::Separator();
 
-        for (const auto& record : records)
-        {
+        for (const auto& record : records) {
           ImGui::Text("%s", record.ship_name.c_str());
           ImGui::NextColumn();
 
@@ -256,122 +274,110 @@ int main() {
       }
 
       ImGui::Spacing();
-      ImGui::Spacing();
 
-      if (ImGui::Button("STEP", ImVec2(100, 40)))
-        advanceRequested = true;
+      // Simulation controls
+      if (!simulationFinished) {
+        if (ImGui::Button("STEP", ImVec2(100, 40))) {
+          advanceRequested = true;
+        }
 
-      ImGui::SameLine();
+        ImGui::SameLine();
 
-      if (ImGui::Button("RUN", ImVec2(100, 40)))
-      {
-        isRunning = true;
-        lastStepTime = 0.0;
+        if (ImGui::Button("RUN", ImVec2(100, 40))) {
+          isRunning = true;
+          lastStepTime = glfwGetTime();
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("STOP", ImVec2(100, 40))) {
+          isRunning = false;
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("FINISH SIMULATION", ImVec2(200, 40))) {
+          finishRequested = true;
+        }
       }
-
-      ImGui::SameLine();
-
-      if (ImGui::Button("STOP", ImVec2(100, 40)))
-        isRunning = false;
-
-      ImGui::SameLine();
-
-      if (ImGui::Button("FINISH SIMULATION", ImVec2(200, 40)))
-        finishRequested = true;
 
       ImGui::EndChild();
     }
 
-    // Statistics
+    // Final statistics
     if (simulationFinished) {
       ImGui::Spacing();
       ImGui::Text("STATISTICS");
 
       ImGui::BeginChild("Statistics", ImVec2(0, 250), true);
 
-      if (simulation)
-      {
+      if (simulation) {
         const auto& stats = simulation->statistics();
 
         ImGui::Text("Arrived ships: %d", stats.arrived_ships());
-        ImGui::Text("Completed ships: %d", stats.completed_ships());
+
+        ImGui::Text("Completed ships: %zu", stats.completions().size());
+
         ImGui::Text("Abandoned ships: %d", stats.abandoned_ships());
+
         ImGui::Text("Rejected ships: %d", stats.rejected_ships());
 
         ImGui::Separator();
 
-        ImGui::Text("Average queue length: %.2f",
-                    stats.average_queue_length());
+        ImGui::Text("Average queue length: %.2f", stats.average_queue_length());
 
-        ImGui::Text("Average waiting time: %.2f days",
-                    stats.average_waiting_days());
+        ImGui::Text("Average waiting time: %.2f days", stats.average_waiting_days());
 
-        ImGui::Text("Maximum waiting time: %d days",
-                    stats.maximum_waiting_days());
+        ImGui::Text("Maximum waiting time: %d days", stats.maximum_waiting_days());
 
-        ImGui::Text("Average unloading delay: %.2f days",
-                    stats.average_unloading_delay_days());
+        ImGui::Text("Average unloading delay: %.2f days", stats.average_unloading_delay_days());
 
-        ImGui::Text("Maximum unloading delay: %d days",
-                    stats.maximum_unloading_delay_days());
+        ImGui::Text("Maximum unloading delay: %d days", stats.maximum_unloading_delay_days());
 
-        ImGui::Text("Total penalties: %.2f",
-                    stats.total_penalties());
+        ImGui::Text("Total penalties: %.2f", stats.total_penalties());
 
-        ImGui::Text("Net revenue: %.2f",
-                    stats.net_revenue());
+        ImGui::Text("Net revenue: %.2f", stats.net_revenue());
 
-        ImGui::Text("Unfinished ships: %zu",
-                    stats.unfinished_ships());
+        ImGui::Text("Unfinished ships: %zu", stats.unfinished_ships());
       }
 
       ImGui::EndChild();
     }
 
     ImGui::End();
-    // Advance simulation
-    if (simulation && !simulationFinished)
-    {
-      if (finishRequested)
-      {
-        while (simulation->current_day() <=
-               simulation->config().simulation_days)
-        {
-          simulation->GenerateRandomParametersForDay(
-              simulation->current_day(), 7);
 
-          lastReport = simulation->SimulateDay();
-          hasReport = true;
+    // Advance simulation
+    if (simulation && !simulationFinished) {
+      int daysToRun = 0;
+
+      if (finishRequested) {
+        daysToRun = simulation->config().simulation_days - simulation->current_day() + 1;
+      } else if (advanceRequested) {
+        daysToRun = simulationStep;
+      } else if (isRunning && glfwGetTime() - lastStepTime >= 0.5) {
+        daysToRun = simulationStep;
+        lastStepTime = glfwGetTime();
+      }
+
+      for (int i = 0; i < daysToRun; ++i) {
+        if (simulation->current_day() > simulation->config().simulation_days) {
+          break;
         }
 
+        simulation->GenerateRandomParametersForDay(simulation->current_day(), 7);
+
+        lastReport = simulation->SimulateDay();
+        hasReport = true;
+      }
+
+      // Finish when the final day has been simulated
+      if (simulation->current_day() > simulation->config().simulation_days || finishRequested) {
         simulation->Finalize();
         simulationFinished = true;
         isRunning = false;
       }
-      else if (advanceRequested ||
-               (isRunning && glfwGetTime() - lastStepTime >= 0.5))
-      {
-        if (simulation->current_day() <=
-            simulation->config().simulation_days)
-        {
-          simulation->GenerateRandomParametersForDay(
-              simulation->current_day(), 7);
-
-          lastReport = simulation->SimulateDay();
-          hasReport = true;
-
-          lastStepTime = glfwGetTime();
-        }
-
-        if (simulation->current_day() >
-            simulation->config().simulation_days)
-        {
-          simulation->Finalize();
-          simulationFinished = true;
-          isRunning = false;
-        }
-      }
     }
+
     // Render
     ImGui::Render();
 
