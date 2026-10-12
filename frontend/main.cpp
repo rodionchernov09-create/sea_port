@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdio>
 #include <memory>
 #include <string>
@@ -18,6 +19,61 @@ namespace {
 struct ScheduledShip {
   sea_port::ShipSpec spec;
 };
+
+struct PlannedWeather {
+  int day = 1;
+  sea_port::Weather weather;
+};
+
+const char* SeasonName(sea_port::Season season) {
+  switch (season) {
+    case sea_port::Season::kWinter:
+      return "Winter";
+    case sea_port::Season::kSpring:
+      return "Spring";
+    case sea_port::Season::kSummer:
+      return "Summer";
+    case sea_port::Season::kAutumn:
+      return "Autumn";
+  }
+  return "Summer";
+}
+
+const char* WeatherName(const sea_port::Weather& weather) {
+  if (weather.storm) return "Storm";
+  if (weather.wave_level >= 3) return "Rough sea";
+  if (weather.wave_level == 2) return "Moderate waves";
+  if (weather.wave_level == 1) return "Small waves";
+  return "Calm sea";
+}
+
+void DrawWeatherList(const std::vector<PlannedWeather>& weatherPlan) {
+  ImGui::Text("PLANNED WEATHER: %zu", weatherPlan.size());
+  if (ImGui::BeginTable("WeatherSchedule", 5,
+                        ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY,
+                        ImVec2(0, 100))) {
+    ImGui::TableSetupColumn("Day");
+    ImGui::TableSetupColumn("Conditions");
+    ImGui::TableSetupColumn("Wave level");
+    ImGui::TableSetupColumn("Operability");
+    ImGui::TableSetupColumn("Storm");
+    ImGui::TableHeadersRow();
+    for (const auto& item : weatherPlan) {
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn();
+      ImGui::Text("%d", item.day);
+      ImGui::TableNextColumn();
+      ImGui::TextUnformatted(WeatherName(item.weather));
+      ImGui::TableNextColumn();
+      ImGui::Text("%d", item.weather.wave_level);
+      ImGui::TableNextColumn();
+      ImGui::Text("%.0f%%", item.weather.operability * 100.0);
+      ImGui::TableNextColumn();
+      ImGui::TextUnformatted(item.weather.storm ? "Yes" : "No");
+    }
+    ImGui::EndTable();
+  }
+}
 
 void DrawShipList(const std::vector<ScheduledShip>& ships) {
   ImGui::Text("SCHEDULED SHIPS: %zu", ships.size());
@@ -50,12 +106,9 @@ void DrawShipList(const std::vector<ScheduledShip>& ships) {
     ImGui::EndTable();
   }
 }
-
-// Tests crane configurations using the same scheduled ships and random seed.
-// A configuration is acceptable when it meets the backend's rating and service-rate targets.
-// Among acceptable configurations, the one with the lowest purchase cost is selected.
 bool FindCraneConfiguration(const sea_port::SimulationConfig& baseConfig,
                             const std::vector<ScheduledShip>& ships,
+                            const std::vector<PlannedWeather>& weatherPlan,
                             std::array<int, sea_port::kCargoTypeCount>& bestCounts,
                             double& bestPenalty, double& bestRating, double& bestServiceRate) {
   bool found = false;
@@ -79,6 +132,12 @@ bool FindCraneConfiguration(const sea_port::SimulationConfig& baseConfig,
 
         for (int day = 1; day <= config.simulation_days; ++day) {
           test.GenerateRandomParametersForDay(day, 7);
+          const auto planned =
+              std::find_if(weatherPlan.begin(), weatherPlan.end(),
+                           [&](const PlannedWeather& item) { return item.day == day; });
+          if (planned != weatherPlan.end()) {
+            test.SetWeather(day, planned->weather);
+          }
           test.SimulateDay();
         }
 
@@ -156,6 +215,7 @@ int main() {
   sea_port::DailyReport lastReport;
   std::vector<sea_port::DailyReport> reportHistory;
   std::vector<ScheduledShip> scheduledShips;
+  std::vector<PlannedWeather> weatherPlan;
 
   double lastStepTime = 0.0;
 
@@ -167,6 +227,11 @@ int main() {
   int unloadingMin = 0;
   int unloadingMax = 3;
   int simulationStep = 1;
+  int seasonIndex = 2;
+  int weatherDay = 1;
+  int waveLevel = 1;
+  float operabilityPercent = 85.0f;
+  bool storm = false;
 
   char shipName[64] = "Ship-001";
   int cargoTypeIndex = 0;
@@ -205,6 +270,8 @@ int main() {
     if (!simulationStarted) {
       ImGui::Text("SIMULATION SETTINGS");
       ImGui::BeginChild("Settings", ImVec2(0, 245), true);
+      const char* seasonNames[] = {"Winter", "Spring", "Summer", "Autumn"};
+      ImGui::Combo("Season", &seasonIndex, seasonNames, 4);
 
       ImGui::Text("NUMBER OF CRANES");
       ImGui::InputInt("Bulk cargo cranes", &cranesType1);
@@ -264,9 +331,39 @@ int main() {
       ImGui::EndChild();
 
       ImGui::Spacing();
+      ImGui::Text("WEATHER SCHEDULE");
+      ImGui::BeginChild("WeatherInput", ImVec2(0, 195), true);
+      ImGui::InputInt("Weather day", &weatherDay);
+      ImGui::SliderInt("Wave level", &waveLevel, 0, 4);
+      ImGui::SliderFloat("Port operability (%)", &operabilityPercent, 0.0f, 100.0f, "%.0f%%");
+      ImGui::Checkbox("Storm", &storm);
+      if (ImGui::Button("ADD / UPDATE WEATHER", ImVec2(220, 34))) {
+        PlannedWeather entry;
+        entry.day = std::clamp(weatherDay, 1, 30);
+        entry.weather.wave_level = std::clamp(waveLevel, 0, 4);
+        entry.weather.operability = std::clamp(operabilityPercent / 100.0, 0.0, 1.0);
+        entry.weather.storm = storm;
+        auto existing =
+            std::find_if(weatherPlan.begin(), weatherPlan.end(),
+                         [&](const PlannedWeather& item) { return item.day == entry.day; });
+        if (existing == weatherPlan.end())
+          weatherPlan.push_back(entry);
+        else
+          *existing = entry;
+        std::sort(weatherPlan.begin(), weatherPlan.end(),
+                  [](const PlannedWeather& a, const PlannedWeather& b) { return a.day < b.day; });
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("REMOVE LAST WEATHER", ImVec2(210, 34)) && !weatherPlan.empty()) {
+        weatherPlan.pop_back();
+      }
+      DrawWeatherList(weatherPlan);
+      ImGui::EndChild();
+      ImGui::Spacing();
 
       if (ImGui::Button("FIND CRANE CONFIGURATION", ImVec2(280, 42))) {
         sea_port::SimulationConfig config;
+        config.season = static_cast<sea_port::Season>(std::clamp(seasonIndex, 0, 3));
         config.crane_counts = {std::max(0, cranesType1), std::max(0, cranesType2),
                                std::max(0, cranesType3)};
         config.arrival_deviation_min_days = std::min(arrivalMin, arrivalMax);
@@ -277,8 +374,8 @@ int main() {
 
         optimizerChecked = true;
         optimizerFound =
-            FindCraneConfiguration(config, scheduledShips, optimizedCounts, optimizedPenalty,
-                                   optimizedRating, optimizedServiceRate);
+            FindCraneConfiguration(config, scheduledShips, weatherPlan, optimizedCounts,
+                                   optimizedPenalty, optimizedRating, optimizedServiceRate);
 
         if (optimizerFound) {
           optimizerMessage = "Acceptable configuration found.";
@@ -311,6 +408,7 @@ int main() {
         if (unloadingMin > unloadingMax) std::swap(unloadingMin, unloadingMax);
 
         sea_port::SimulationConfig config;
+        config.season = static_cast<sea_port::Season>(std::clamp(seasonIndex, 0, 3));
         config.crane_counts = {cranesType1, cranesType2, cranesType3};
         config.arrival_deviation_min_days = arrivalMin;
         config.arrival_deviation_max_days = arrivalMax;
@@ -335,6 +433,7 @@ int main() {
     if (simulationStarted && simulation) {
       ImGui::Text("SETTINGS");
       ImGui::BeginChild("SmallSettings", ImVec2(0, 105), true);
+      ImGui::Text("Season: %s", SeasonName(simulation->config().season));
       ImGui::Text("Cranes (bulk / liquid / container): %d / %d / %d", cranesType1, cranesType2,
                   cranesType3);
       ImGui::Text("Arrival deviation: %d ... %d days", arrivalMin, arrivalMax);
@@ -359,6 +458,11 @@ int main() {
         ImGui::Text("Waiting: %zu | Unloading: %zu", lastReport.waiting, lastReport.unloading);
         ImGui::Text("Rating: %.1f | Daily net revenue: %.2f", lastReport.rating,
                     lastReport.daily_net_revenue);
+        ImGui::Separator();
+        ImGui::Text("WEATHER: %s", WeatherName(lastReport.weather));
+        ImGui::Text("Wave level: %d | Operability: %.0f%% | Storm: %s",
+                    lastReport.weather.wave_level, lastReport.weather.operability * 100.0,
+                    lastReport.weather.storm ? "Yes" : "No");
 
         ImGui::Separator();
         ImGui::Text("QUEUES BY CARGO TYPE");
@@ -373,6 +477,7 @@ int main() {
         for (const auto& operation : lastReport.active_operations) {
           ImGui::BulletText("%s", operation.c_str());
         }
+
         ImGui::Text("EVENTS");
         for (const auto& event : lastReport.events) {
           ImGui::BulletText("%s", event.c_str());
@@ -390,6 +495,9 @@ int main() {
           const auto& report = reportHistory[i];
           ImGui::Text("Arrived: %d | Completed: %d | Waiting: %zu", report.arrived,
                       report.completed, report.waiting);
+          ImGui::Text("Weather: %s | Waves: %d | Operability: %.0f%% | Storm: %s",
+                      WeatherName(report.weather), report.weather.wave_level,
+                      report.weather.operability * 100.0, report.weather.storm ? "Yes" : "No");
           for (const auto& event : report.events) {
             ImGui::BulletText("%s", event.c_str());
           }
@@ -500,7 +608,14 @@ int main() {
         if (simulation->current_day() > simulation->config().simulation_days) {
           break;
         }
-        simulation->GenerateRandomParametersForDay(simulation->current_day(), 7);
+        const int day = simulation->current_day();
+        simulation->GenerateRandomParametersForDay(day, 7);
+        const auto planned =
+            std::find_if(weatherPlan.begin(), weatherPlan.end(),
+                         [&](const PlannedWeather& item) { return item.day == day; });
+        if (planned != weatherPlan.end()) {
+          simulation->SetWeather(day, planned->weather);
+        }
         lastReport = simulation->SimulateDay();
         reportHistory.push_back(lastReport);
         hasReport = true;
