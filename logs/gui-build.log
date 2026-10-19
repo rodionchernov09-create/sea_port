@@ -1,0 +1,12 @@
+[ 47%] Built target sea_port_lib
+[ 65%] Building CXX object CMakeFiles/sea_port_gui.dir/external/imgui/imgui.cpp.o
+[ 65%] Built target integration_test
+[ 65%] Building CXX object CMakeFiles/sea_port_gui.dir/frontend/main.cpp.o
+[ 73%] Built target sea_port
+[ 78%] Building CXX object CMakeFiles/sea_port_gui.dir/external/imgui/imgui_draw.cpp.o
+[ 82%] Building CXX object CMakeFiles/sea_port_gui.dir/external/imgui/imgui_tables.cpp.o
+[ 86%] Building CXX object CMakeFiles/sea_port_gui.dir/external/imgui/imgui_widgets.cpp.o
+[ 91%] Building CXX object CMakeFiles/sea_port_gui.dir/external/imgui/backends/imgui_impl_glfw.cpp.o
+[ 95%] Building CXX object CMakeFiles/sea_port_gui.dir/external/imgui/backends/imgui_impl_opengl3.cpp.o
+[100%] Linking CXX executable sea_port_gui
+[100%] Built target sea_port_gui

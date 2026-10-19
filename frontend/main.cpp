@@ -311,8 +311,8 @@ int main() {
         sea_port::ShipSpec spec;
         spec.name = shipName;
         spec.cargo_type = static_cast<sea_port::CargoType>(std::clamp(cargoTypeIndex, 0, 2));
-        spec.booking_day = std::max(1, plannedArrivalDay);
-        spec.planned_arrival_day = std::max(1, plannedArrivalDay);
+        spec.booking_day = std::clamp(plannedArrivalDay, 1, 30);
+        spec.planned_arrival_day = std::clamp(plannedArrivalDay, 1, 30);
         spec.cargo_weight_tons = std::max(1.0f, cargoWeight);
         spec.planned_stay_days = std::max(1, plannedStayDays);
 
@@ -334,13 +334,13 @@ int main() {
       ImGui::Text("WEATHER SCHEDULE");
       ImGui::BeginChild("WeatherInput", ImVec2(0, 195), true);
       ImGui::InputInt("Weather day", &weatherDay);
-      ImGui::SliderInt("Wave level", &waveLevel, 0, 4);
+      ImGui::SliderInt("Wave level", &waveLevel, 0, 5);
       ImGui::SliderFloat("Port operability (%)", &operabilityPercent, 0.0f, 100.0f, "%.0f%%");
       ImGui::Checkbox("Storm", &storm);
       if (ImGui::Button("ADD / UPDATE WEATHER", ImVec2(220, 34))) {
         PlannedWeather entry;
         entry.day = std::clamp(weatherDay, 1, 30);
-        entry.weather.wave_level = std::clamp(waveLevel, 0, 4);
+        entry.weather.wave_level = std::clamp(waveLevel, 0, 5);
         entry.weather.operability = std::clamp(operabilityPercent / 100.0, 0.0, 1.0);
         entry.weather.storm = storm;
         auto existing =
@@ -368,8 +368,8 @@ int main() {
                                std::max(0, cranesType3)};
         config.arrival_deviation_min_days = std::min(arrivalMin, arrivalMax);
         config.arrival_deviation_max_days = std::max(arrivalMin, arrivalMax);
-        config.unloading_delay_min_days = std::min(unloadingMin, unloadingMax);
-        config.unloading_delay_max_days = std::max(unloadingMin, unloadingMax);
+        config.unloading_delay_min_days = std::max(0, std::min(unloadingMin, unloadingMax));
+        config.unloading_delay_max_days = std::max(0, std::max(unloadingMin, unloadingMax));
         config.step_days = std::clamp(simulationStep, 1, 3);
 
         optimizerChecked = true;
@@ -405,6 +405,8 @@ int main() {
         cranesType2 = std::max(0, cranesType2);
         cranesType3 = std::max(0, cranesType3);
         if (arrivalMin > arrivalMax) std::swap(arrivalMin, arrivalMax);
+        unloadingMin = std::max(0, unloadingMin);
+        unloadingMax = std::max(0, unloadingMax);
         if (unloadingMin > unloadingMax) std::swap(unloadingMin, unloadingMax);
 
         sea_port::SimulationConfig config;

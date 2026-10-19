@@ -45,6 +45,8 @@ target_link_libraries(sea_port PRIVATE
 )
 
 
+option(SEA_PORT_BUILD_GUI "Build the ImGui desktop application" ON)
+if(SEA_PORT_BUILD_GUI)
 find_package(OpenGL REQUIRED)
 find_package(glfw3 REQUIRED)
 
@@ -70,3 +72,11 @@ target_link_libraries(sea_port_gui PRIVATE
         OpenGL::GL
         sea_port_lib
 )
+endif()
+
+include(CTest)
+if(BUILD_TESTING)
+  add_executable(integration_test tests/integration_test.cpp)
+  target_link_libraries(integration_test PRIVATE sea_port_lib)
+  add_test(NAME backend_integration COMMAND integration_test)
+endif()

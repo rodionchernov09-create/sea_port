@@ -35,7 +35,7 @@ std::string ToString(Season season) {
 std::string ToString(ShipState state) {
   switch (state) {
     case ShipState::kScheduled:
-      return "sceduled";
+      return "scheduled";
     case ShipState::kWaiting:
       return "waiting";
     case ShipState::kUnloading:

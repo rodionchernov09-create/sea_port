@@ -28,6 +28,7 @@ CargoType Crane::cargo_type() const { return cargo_type_; }
 double Crane::base_throughput_tons_per_day() const { return base_throughput_tons_per_day_; }
 
 double Crane::DailyThroughput(const Weather& weather) const {
+  if (weather.wave_level >= 5) return 0.0;
   return base_throughput_tons_per_day_ * std::clamp(weather.operability, 0.0, 1.0);
 }
 

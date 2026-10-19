@@ -1,0 +1,7 @@
+[  6%] Building CXX object CMakeFiles/sea_port_lib.dir/src/crane.cpp.o
+[ 13%] Linking CXX static library libsea_port_lib.a
+[ 73%] Built target sea_port_lib
+[ 80%] Linking CXX executable integration_test
+[ 86%] Linking CXX executable sea_port
+[ 93%] Built target sea_port
+[100%] Built target integration_test

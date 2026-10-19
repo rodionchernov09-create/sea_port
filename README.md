@@ -56,3 +56,20 @@ cmake --build build --parallel
 - [Публичный API](docs/api.md)
 - [План и состояние реализации](PLAN.md)
 # sea_port
+
+## Графический интерфейс
+
+Интеграция интерфейса находится в истории ветки `frontend`; локальная `main`
+обновлена до неё. Перед сборкой загрузите ImGui:
+
+```bash
+git submodule update --init --recursive
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+./build/sea_port_gui
+```
+
+Для GUI требуются OpenGL и GLFW 3 (пакет разработки).
+Для сборки только консоли используйте `-DSEA_PORT_BUILD_GUI=OFF`.
+План, результаты проверки интеграции и журнал изменений: `docs/WORK_LOG.md`.
