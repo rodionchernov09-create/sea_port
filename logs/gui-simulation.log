@@ -1,0 +1,112 @@
+GUI smoke session, exit code 0
+
+START cranes=2,3,1 berths=4,3,3 waiting_capacity=20 random=1
+day=1 arrived=0 waiting=0 unloading=0 completed=0 rejected=0 abandoned=0
+day=2 arrived=1 waiting=0 unloading=1 completed=0 rejected=0 abandoned=0
+  AUTO-0001 (bulk): arrived
+  AUTO-0001 (bulk): unloading began by crane CRANE-1-1
+day=3 arrived=0 waiting=0 unloading=1 completed=0 rejected=0 abandoned=0
+day=4 arrived=0 waiting=0 unloading=1 completed=0 rejected=0 abandoned=0
+day=5 arrived=0 waiting=0 unloading=0 completed=1 rejected=0 abandoned=0
+  AUTO-0001: unloading completed, result 166598 $
+day=6 arrived=1 waiting=0 unloading=1 completed=0 rejected=0 abandoned=0
+  AUTO-0002 (bulk): arrived
+  AUTO-0002 (bulk): unloading began by crane CRANE-1-1
+day=7 arrived=2 waiting=0 unloading=3 completed=0 rejected=0 abandoned=0
+  AUTO-0003 (bulk): arrived
+  AUTO-0004 (tanker): arrived
+  AUTO-0003 (bulk): unloading began by crane CRANE-1-2
+  AUTO-0004 (tanker): unloading began by crane CRANE-2-1
+day=8 arrived=1 waiting=0 unloading=3 completed=1 rejected=0 abandoned=0
+  AUTO-0006 (container): arrived
+  AUTO-0006 (container): unloading began by crane CRANE-3-1
+  AUTO-0004: unloading completed, result 143812 $
+day=9 arrived=1 waiting=1 unloading=3 completed=0 rejected=0 abandoned=0
+  AUTO-0005 (container): arrived
+day=10 arrived=1 waiting=2 unloading=3 completed=0 rejected=0 abandoned=0
+  AUTO-0009 (bulk): arrived
+day=11 arrived=3 waiting=2 unloading=6 completed=0 rejected=0 abandoned=0
+  AUTO-0007 (tanker): arrived
+  AUTO-0011 (tanker): arrived
+  AUTO-0012 (tanker): arrived
+  AUTO-0012 (tanker): unloading began by crane CRANE-2-1
+  AUTO-0007 (tanker): unloading began by crane CRANE-2-2
+  AUTO-0011 (tanker): unloading began by crane CRANE-2-3
+day=12 arrived=2 waiting=4 unloading=3 completed=3 rejected=0 abandoned=0
+  AUTO-0008 (tanker): arrived
+  AUTO-0010 (bulk): arrived
+  AUTO-0002: unloading completed, result 241451 $
+  AUTO-0003: unloading completed, result 251406 $
+  AUTO-0011: unloading completed, result 121318 $
+day=13 arrived=2 waiting=2 unloading=5 completed=1 rejected=0 abandoned=1
+  AUTO-0016 (tanker): arrived
+  AUTO-0017 (bulk): arrived
+  AUTO-0005 (container): gone before unloading
+  AUTO-0009 (bulk): unloading began by crane CRANE-1-1
+  AUTO-0010 (bulk): unloading began by crane CRANE-1-2
+  AUTO-0008 (tanker): unloading began by crane CRANE-2-3
+  AUTO-0006: unloading completed, result 450470 $
+day=14 arrived=1 waiting=3 unloading=4 completed=1 rejected=0 abandoned=0
+  AUTO-0019 (bulk): arrived
+  AUTO-0009: unloading completed, result 77760 $
+day=15 arrived=2 waiting=4 unloading=5 completed=0 rejected=0 abandoned=0
+  AUTO-0013 (tanker): arrived
+  AUTO-0014 (tanker): arrived
+  AUTO-0017 (bulk): unloading began by crane CRANE-1-1
+day=16 arrived=1 waiting=5 unloading=3 completed=2 rejected=0 abandoned=0
+  AUTO-0020 (bulk): arrived
+  AUTO-0012: unloading completed, result 550979 $
+  AUTO-0007: unloading completed, result 549241 $
+day=17 arrived=2 waiting=4 unloading=3 completed=1 rejected=0 abandoned=2
+  AUTO-0018 (bulk): arrived
+  AUTO-0021 (bulk): arrived
+  AUTO-0016 (tanker): gone before unloading
+  AUTO-0013 (tanker): gone before unloading
+  AUTO-0014 (tanker): unloading began by crane CRANE-2-1
+  AUTO-0017: unloading completed, result 151166 $
+day=18 arrived=1 waiting=3 unloading=4 completed=1 rejected=0 abandoned=0
+  AUTO-0015 (tanker): arrived
+  AUTO-0019 (bulk): unloading began by crane CRANE-1-1
+  AUTO-0015 (tanker): unloading began by crane CRANE-2-2
+  AUTO-0010: unloading completed, result 114304 $
+day=19 arrived=1 waiting=2 unloading=4 completed=1 rejected=0 abandoned=1
+  AUTO-0022 (tanker): arrived
+  AUTO-0018 (bulk): gone before unloading
+  AUTO-0020 (bulk): unloading began by crane CRANE-1-2
+  AUTO-0008: unloading completed, result 542657 $
+day=20 arrived=0 waiting=1 unloading=4 completed=1 rejected=0 abandoned=0
+  AUTO-0022 (tanker): unloading began by crane CRANE-2-3
+  AUTO-0014: unloading completed, result 197557 $
+day=21 arrived=0 waiting=1 unloading=3 completed=1 rejected=0 abandoned=0
+  AUTO-0022: unloading completed, result 200331 $
+day=22 arrived=1 waiting=0 unloading=2 completed=2 rejected=0 abandoned=1
+  AUTO-0023 (tanker): arrived
+  AUTO-0021 (bulk): gone before unloading
+  AUTO-0023 (tanker): unloading began by crane CRANE-2-1
+  AUTO-0019: unloading completed, result 163210 $
+  AUTO-0015: unloading completed, result 170461 $
+day=23 arrived=1 waiting=0 unloading=3 completed=0 rejected=0 abandoned=0
+  AUTO-0024 (tanker): arrived
+  AUTO-0024 (tanker): unloading began by crane CRANE-2-2
+day=24 arrived=1 waiting=0 unloading=4 completed=0 rejected=0 abandoned=0
+  AUTO-0025 (container): arrived
+  AUTO-0025 (container): unloading began by crane CRANE-3-1
+day=25 arrived=0 waiting=0 unloading=3 completed=1 rejected=0 abandoned=0
+  AUTO-0023: unloading completed, result 375757 $
+day=26 arrived=1 waiting=0 unloading=3 completed=1 rejected=0 abandoned=0
+  AUTO-0026 (bulk): arrived
+  AUTO-0026 (bulk): unloading began by crane CRANE-1-1
+  AUTO-0024: unloading completed, result 233400 $
+day=27 arrived=1 waiting=0 unloading=3 completed=1 rejected=0 abandoned=0
+  AUTO-0027 (tanker): arrived
+  AUTO-0027 (tanker): unloading began by crane CRANE-2-1
+  AUTO-0020: unloading completed, result 341448 $
+day=28 arrived=2 waiting=1 unloading=4 completed=0 rejected=0 abandoned=0
+  AUTO-0028 (container): arrived
+  AUTO-0030 (tanker): arrived
+  AUTO-0030 (tanker): unloading began by crane CRANE-2-2
+day=29 arrived=0 waiting=1 unloading=4 completed=0 rejected=0 abandoned=0
+day=30 arrived=0 waiting=0 unloading=2 completed=2 rejected=0 abandoned=1
+  AUTO-0028 (container): gone before unloading
+  AUTO-0025: unloading completed, result 513722 $
+  AUTO-0026: unloading completed, result 189733 $

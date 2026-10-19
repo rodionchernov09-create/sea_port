@@ -189,6 +189,7 @@ void PortSimulation::ProcessArrivals(DailyReport& report) {
     ++report.arrived;
     if (waiting_ship_count() >= config_.waiting_capacity) {
       ship->set_state(ShipState::kRejected);
+      report.departures.push_back({ship->id(), ship->name(), ship->cargo().type(), ShipState::kRejected, -1, ship->cargo().weight_tons(), ship->cargo().weight_tons()});
       statistics_.RecordRejection();
       ++report.rejected;
       AdjustRating(kRatingLossForRejection);
@@ -209,6 +210,7 @@ void PortSimulation::ProcessAbandonments(DailyReport& report) {
     });
     for (auto& ship : abandoned) {
       ship->set_state(ShipState::kAbandoned);
+      report.departures.push_back({ship->id(), ship->name(), ship->cargo().type(), ShipState::kAbandoned, -1, ship->cargo().weight_tons(), ship->cargo().weight_tons()});
       statistics_.RecordAbandonment();
       ++report.abandoned;
       AdjustRating(kRatingLossForAbandonment);
@@ -273,6 +275,12 @@ void PortSimulation::ProcessUnloading(const Weather& weather, DailyReport& repor
 
     CompletionRecord record = CompleteUnloading(unloading);
     unloading.ship->set_state(ShipState::kCompleted);
+    int berth = 0;
+    for (const auto& crane : cranes_) {
+      if (crane.get() == unloading.crane) break;
+      if (crane->cargo_type() == unloading.ship->cargo().type()) ++berth;
+    }
+    report.departures.push_back({unloading.ship->id(), unloading.ship->name(), unloading.ship->cargo().type(), ShipState::kCompleted, berth, unloading.ship->cargo().weight_tons(), 0});
     unloading.crane->Release();
     statistics_.RecordCompletion(record);
     ++report.completed;
@@ -371,6 +379,27 @@ void PortSimulation::Finalize() {
   }
   statistics_.set_unfinished_ships(waiting_ship_count() + active_unloadings_.size());
   finalized_ = true;
+}
+
+std::vector<ShipView> PortSimulation::VisualSnapshot() const {
+  std::vector<ShipView> result;
+  for (const auto& queue : queues_) {
+    queue.ForEach([&result](const Ship& ship) {
+      result.push_back({ship.id(), ship.name(), ship.cargo().type(), ship.state(), -1,
+                        ship.cargo().weight_tons(), ship.cargo().weight_tons()});
+    });
+  }
+  for (const auto& unloading : active_unloadings_) {
+    int berth = 0;
+    for (const auto& crane : cranes_) {
+      if (crane.get() == unloading.crane) break;
+      if (crane->cargo_type() == unloading.ship->cargo().type()) ++berth;
+    }
+    result.push_back({unloading.ship->id(), unloading.ship->name(), unloading.ship->cargo().type(),
+                      ShipState::kUnloading, berth, unloading.ship->cargo().weight_tons(),
+                      std::max(0.0, unloading.remaining_tons)});
+  }
+  return result;
 }
 
 int PortSimulation::current_day() const { return current_day_; }

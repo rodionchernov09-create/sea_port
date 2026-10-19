@@ -48,10 +48,17 @@ target_link_libraries(sea_port PRIVATE
 option(SEA_PORT_BUILD_GUI "Build the ImGui desktop application" ON)
 if(SEA_PORT_BUILD_GUI)
 find_package(OpenGL REQUIRED)
-find_package(glfw3 REQUIRED)
+find_package(glfw3 QUIET)
+if(NOT TARGET glfw)
+  set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+  set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+  set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+  add_subdirectory(external/glfw)
+endif()
 
 add_executable(sea_port_gui
         frontend/main.cpp
+        frontend/port_view.cpp
 
         external/imgui/imgui.cpp
         external/imgui/imgui_draw.cpp

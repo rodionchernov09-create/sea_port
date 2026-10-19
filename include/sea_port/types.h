@@ -91,7 +91,19 @@ struct CompletionRecord {
   double net_revenue = 0.0;
 };
 
+// Read-only data for rendering; identities never depend on display names.
+struct ShipView {
+  std::uint64_t id = 0;
+  std::string name;
+  CargoType cargo_type = CargoType::kBulk;
+  ShipState state = ShipState::kWaiting;
+  int berth = -1;
+  double total_tons = 0;
+  double remaining_tons = 0;
+};
+
 struct DailyReport {
+  std::vector<ShipView> departures;
   int day = 0;
   Weather weather;
   int arrived = 0;

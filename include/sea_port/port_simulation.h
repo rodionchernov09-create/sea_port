@@ -27,6 +27,7 @@ class PortSimulation {
   void RunRandomMonth();
   void Finalize();
 
+  std::vector<ShipView> VisualSnapshot() const;
   int current_day() const;
   double rating() const;
   std::size_t waiting_ship_count() const;

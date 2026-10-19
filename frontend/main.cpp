@@ -5,10 +5,14 @@
 #include <cmath>
 #include <cstdio>
 #include <memory>
+#include <filesystem>
+#include <fstream>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
 #include "imgui.h"
+#include "port_view.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "sea_port/port_simulation.h"
@@ -191,6 +195,13 @@ int main() {
 
   ImGuiIO& io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+  const char* fontPaths[] = {"/usr/share/fonts/TTF/JetBrainsMono-Regular.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "C:/Windows/Fonts/arial.ttf"};
+  for (const char* font : fontPaths) {
+    if (std::filesystem::exists(font)) {
+      io.Fonts->AddFontFromFileTTF(font, 16.0f, nullptr, io.Fonts->GetGlyphRangesCyrillic());
+      break;
+    }
+  }
   ImGui::StyleColorsDark();
 
   ImGuiStyle& style = ImGui::GetStyle();
@@ -218,6 +229,18 @@ int main() {
   std::vector<PlannedWeather> weatherPlan;
 
   double lastStepTime = 0.0;
+  float speed = 1.0f;
+  float animationBudget = 0;
+  PortView portView;
+  int waitingCapacity = 20;
+  int berthCounts[3] = {4, 3, 3};
+  bool randomTraffic = true;
+  std::filesystem::create_directories("logs/runtime");
+  std::ofstream runtimeLog("logs/runtime/simulation.log", std::ios::app);
+  runtimeLog << "GUI session started\n";
+  const bool smoke = std::getenv("SEA_PORT_SMOKE") != nullptr;
+  int smokeFrames = 0;
+  if (smoke) speed = 8;
 
   int cranesType1 = 2;
   int cranesType2 = 3;
@@ -249,6 +272,7 @@ int main() {
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
 
+    bool startRequested = false;
     bool advanceRequested = false;
     bool finishRequested = false;
 
@@ -269,14 +293,18 @@ int main() {
 
     if (!simulationStarted) {
       ImGui::Text("SIMULATION SETTINGS");
+      if (ImGui::Button("START SIMULATION##top", ImVec2(250, 42))) startRequested = true;
       ImGui::BeginChild("Settings", ImVec2(0, 245), true);
       const char* seasonNames[] = {"Winter", "Spring", "Summer", "Autumn"};
       ImGui::Combo("Season", &seasonIndex, seasonNames, 4);
 
+      ImGui::Checkbox("Generate random ship traffic", &randomTraffic);
+      ImGui::SliderInt("Waiting parking capacity", &waitingCapacity, 1, 120);
+      ImGui::SliderInt3("Berths: bulk / liquid / container", berthCounts, 0, 12);
       ImGui::Text("NUMBER OF CRANES");
-      ImGui::InputInt("Bulk cargo cranes", &cranesType1);
-      ImGui::InputInt("Liquid cargo cranes", &cranesType2);
-      ImGui::InputInt("Container cranes", &cranesType3);
+      ImGui::SliderInt("Bulk cargo cranes", &cranesType1, 0, 12);
+      ImGui::SliderInt("Liquid cargo cranes", &cranesType2, 0, 12);
+      ImGui::SliderInt("Container cranes", &cranesType3, 0, 12);
 
       ImGui::Separator();
       ImGui::Text("ARRIVAL DEVIATION (DAYS)");
@@ -311,10 +339,10 @@ int main() {
         sea_port::ShipSpec spec;
         spec.name = shipName;
         spec.cargo_type = static_cast<sea_port::CargoType>(std::clamp(cargoTypeIndex, 0, 2));
-        spec.booking_day = std::clamp(plannedArrivalDay, 1, 30);
+        spec.booking_day = 1;
         spec.planned_arrival_day = std::clamp(plannedArrivalDay, 1, 30);
-        spec.cargo_weight_tons = std::max(1.0f, cargoWeight);
-        spec.planned_stay_days = std::max(1, plannedStayDays);
+        spec.cargo_weight_tons = std::isfinite(cargoWeight) ? std::clamp(cargoWeight, 1.0f, 1000000.0f) : 1000.0f;
+        spec.planned_stay_days = std::clamp(plannedStayDays, 1, 365);
 
         scheduledShips.push_back({spec});
 
@@ -361,8 +389,20 @@ int main() {
       ImGui::EndChild();
       ImGui::Spacing();
 
+      waitingCapacity = std::clamp(waitingCapacity, 1, 120);
+      for (int& count : berthCounts) count = std::clamp(count, 0, 12);
+      cranesType1 = std::clamp(cranesType1, 0, 12);
+      cranesType2 = std::clamp(cranesType2, 0, 12);
+      cranesType3 = std::clamp(cranesType3, 0, 12);
+      arrivalMin = std::clamp(arrivalMin, -30, 30);
+      arrivalMax = std::clamp(arrivalMax, -30, 30);
+      unloadingMin = std::clamp(unloadingMin, 0, 30);
+      unloadingMax = std::clamp(unloadingMax, 0, 30);
       if (ImGui::Button("FIND CRANE CONFIGURATION", ImVec2(280, 42))) {
         sea_port::SimulationConfig config;
+        config.waiting_capacity = static_cast<std::size_t>(waitingCapacity);
+        config.unloading_places = {berthCounts[0], berthCounts[1], berthCounts[2]};
+        if (!randomTraffic) config.current_day_arrival_rate = 0;
         config.season = static_cast<sea_port::Season>(std::clamp(seasonIndex, 0, 3));
         config.crane_counts = {std::max(0, cranesType1), std::max(0, cranesType2),
                                std::max(0, cranesType3)};
@@ -400,7 +440,7 @@ int main() {
       }
 
       ImGui::Spacing();
-      if (ImGui::Button("START SIMULATION", ImVec2(250, 48))) {
+      if (ImGui::Button("START SIMULATION", ImVec2(250, 48)) || startRequested || (smoke && !simulationStarted)) {
         cranesType1 = std::max(0, cranesType1);
         cranesType2 = std::max(0, cranesType2);
         cranesType3 = std::max(0, cranesType3);
@@ -410,6 +450,9 @@ int main() {
         if (unloadingMin > unloadingMax) std::swap(unloadingMin, unloadingMax);
 
         sea_port::SimulationConfig config;
+        config.waiting_capacity = static_cast<std::size_t>(waitingCapacity);
+        config.unloading_places = {berthCounts[0], berthCounts[1], berthCounts[2]};
+        if (!randomTraffic) config.current_day_arrival_rate = 0;
         config.season = static_cast<sea_port::Season>(std::clamp(seasonIndex, 0, 3));
         config.crane_counts = {cranesType1, cranesType2, cranesType3};
         config.arrival_deviation_min_days = arrivalMin;
@@ -423,36 +466,71 @@ int main() {
           simulation->ScheduleShip(item.spec);
         }
 
+        portView.Reset();
+        animationBudget = 0;
+        runtimeLog << "START cranes=" << cranesType1 << ',' << cranesType2 << ',' << cranesType3
+                   << " berths=" << berthCounts[0] << ',' << berthCounts[1] << ',' << berthCounts[2]
+                   << " waiting_capacity=" << waitingCapacity << " random=" << randomTraffic << '\n';
         reportHistory.clear();
         simulationStarted = true;
         simulationFinished = false;
-        isRunning = false;
+        isRunning = smoke;
         hasReport = false;
         lastStepTime = glfwGetTime();
       }
     }
 
     if (simulationStarted && simulation) {
-      ImGui::Text("SETTINGS");
-      ImGui::BeginChild("SmallSettings", ImVec2(0, 105), true);
+      ImGui::Text("PORT CONFIGURATION");
       ImGui::Text("Season: %s", SeasonName(simulation->config().season));
       ImGui::Text("Cranes (bulk / liquid / container): %d / %d / %d", cranesType1, cranesType2,
                   cranesType3);
-      ImGui::Text("Arrival deviation: %d ... %d days", arrivalMin, arrivalMax);
-      ImGui::Text("Unloading delay: %d ... %d days", unloadingMin, unloadingMax);
-      ImGui::Text("Step: %d day(s)", simulationStep);
-      ImGui::Text("Scheduled ships: %zu", scheduledShips.size());
-      ImGui::EndChild();
-
+      ImGui::Text("Berths: %d / %d / %d | Parking: %d | Step: %d day(s)", berthCounts[0], berthCounts[1], berthCounts[2], waitingCapacity, simulationStep);
       ImGui::Spacing();
       ImGui::Text("SIMULATION");
-      ImGui::BeginChild("Simulation", ImVec2(0, 0), true);
+
 
       ImGui::Text("DAY %d / %d",
                   std::min(simulation->current_day() - 1, simulation->config().simulation_days),
                   simulation->config().simulation_days);
       ImGui::Separator();
 
+      if (!simulationFinished) {
+        if (ImGui::Button("STEP", ImVec2(100, 38))) {
+          advanceRequested = true;
+          animationBudget = 3.5f;
+          isRunning = false;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("RUN", ImVec2(100, 38))) {
+          isRunning = true;
+          lastStepTime = glfwGetTime();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("STOP", ImVec2(100, 38))) {
+          isRunning = false;
+          animationBudget = 0;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("FINISH SIMULATION", ImVec2(200, 38))) {
+          finishRequested = true;
+          isRunning = false;
+        }
+      } else {
+        ImGui::Text("SIMULATION FINISHED");
+      }
+
+      ImGui::SetNextItemWidth(280);
+      ImGui::SliderFloat("Playback speed", &speed, 0.25f, 8.0f, "%.2fx", ImGuiSliderFlags_Logarithmic);
+      speed = std::clamp(speed, 0.25f, 8.0f);
+      ImGui::SameLine(); ImGui::TextDisabled("1x = 4 seconds / day");
+      if (hasReport) ImGui::Text("Waiting %zu | Unloading %zu | Completed %d | Waves %d | Operability %.0f%%",
+          lastReport.waiting, lastReport.unloading, simulation->statistics().completed_ships(),
+          lastReport.weather.wave_level, lastReport.weather.operability * 100);
+      const float visualDelta = (isRunning || animationBudget > 0) ? std::min(io.DeltaTime, 0.1f) * speed : 0;
+      animationBudget = std::max(0.0f, animationBudget - visualDelta);
+      portView.Draw(*simulation, visualDelta);
+      if (ImGui::CollapsingHeader("Reports, events and completed unloadings")) {
       if (hasReport) {
         ImGui::Text("DAILY REPORT");
         ImGui::Text("Arrived: %d | Started unloading: %d | Completed: %d", lastReport.arrived,
@@ -542,30 +620,8 @@ int main() {
       }
 
       ImGui::Separator();
-      if (!simulationFinished) {
-        if (ImGui::Button("STEP", ImVec2(100, 38))) {
-          advanceRequested = true;
-          isRunning = false;
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("RUN", ImVec2(100, 38))) {
-          isRunning = true;
-          lastStepTime = glfwGetTime();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("STOP", ImVec2(100, 38))) {
-          isRunning = false;
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("FINISH SIMULATION", ImVec2(200, 38))) {
-          finishRequested = true;
-          isRunning = false;
-        }
-      } else {
-        ImGui::Text("SIMULATION FINISHED");
-      }
 
-      ImGui::EndChild();
+      } // report details
     }
 
     if (simulationFinished && simulation) {
@@ -593,6 +649,15 @@ int main() {
       ImGui::EndChild();
     }
 
+    if (simulationStarted && ImGui::Button("BACK TO SETTINGS")) {
+      simulationStarted = false;
+      simulationFinished = false;
+      isRunning = false;
+      advanceRequested = finishRequested = false;
+      simulation.reset();
+      portView.Reset();
+      runtimeLog << "Returned to settings\n";
+    }
     ImGui::End();
 
     if (simulation && !simulationFinished) {
@@ -601,8 +666,8 @@ int main() {
         daysToRun = simulation->config().simulation_days - simulation->current_day() + 1;
       } else if (advanceRequested) {
         daysToRun = simulationStep;
-      } else if (isRunning && glfwGetTime() - lastStepTime >= 0.5) {
-        daysToRun = simulationStep;
+      } else if (isRunning && glfwGetTime() - lastStepTime >= (4.0 / speed)) {
+        daysToRun = 1;
         lastStepTime = glfwGetTime();
       }
 
@@ -619,6 +684,14 @@ int main() {
           simulation->SetWeather(day, planned->weather);
         }
         lastReport = simulation->SimulateDay();
+        portView.Update(*simulation, lastReport);
+        animationBudget = 3.5f;
+        runtimeLog << "day=" << day << " arrived=" << lastReport.arrived
+                   << " waiting=" << lastReport.waiting << " unloading=" << lastReport.unloading
+                   << " completed=" << lastReport.completed << " rejected=" << lastReport.rejected
+                   << " abandoned=" << lastReport.abandoned << '\n';
+        for (const auto& event : lastReport.events) runtimeLog << "  " << event << '\n';
+        runtimeLog.flush();
         reportHistory.push_back(lastReport);
         hasReport = true;
       }
@@ -638,7 +711,17 @@ int main() {
     glClearColor(0.05f, 0.06f, 0.08f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    if (smoke && smokeFrames == 600) {
+      std::vector<unsigned char> pixels(static_cast<std::size_t>(displayW * displayH * 3));
+      glPixelStorei(GL_PACK_ALIGNMENT, 1);
+      glReadPixels(0, 0, displayW, displayH, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+      std::ofstream screenshot("logs/runtime/preview.ppm", std::ios::binary);
+      screenshot << "P6\n" << displayW << ' ' << displayH << "\n255\n";
+      for (int y = displayH - 1; y >= 0; --y)
+        screenshot.write(reinterpret_cast<const char*>(pixels.data() + y * displayW * 3), displayW * 3);
+    }
     glfwSwapBuffers(window);
+    if (smoke && ++smokeFrames > 1100) glfwSetWindowShouldClose(window, GLFW_TRUE);
   }
 
   ImGui_ImplOpenGL3_Shutdown();
