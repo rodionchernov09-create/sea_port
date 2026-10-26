@@ -25,13 +25,14 @@ void Ship(ImDrawList* d, ImVec2 p, int type, bool leaving) {
   }
   if(leaving) d->AddLine({p.x-45,p.y},{p.x-36,p.y},IM_COL32(163,217,242,180),2);
 }
-void Crane(ImDrawList* d, ImVec2 p, int type, bool busy) {
+void Crane(ImDrawList* d, ImVec2 p, int type, bool busy, float time) {
   const ImU32 color=accents[type];
+  const float swing=busy ? std::sin(time*2.0f+p.x*.03f)*4.0f : 0.0f;
   d->AddRectFilled({p.x-12,p.y-6},{p.x+12,p.y+8},IM_COL32(53,68,80,255),3);
   if(type==0) {
     d->AddLine(p,{p.x+18,p.y-38},color,5);
-    d->AddLine({p.x+18,p.y-38},{p.x+35,p.y-18},color,4);
-    d->AddTriangleFilled({p.x+29,p.y-17},{p.x+41,p.y-17},{p.x+35,p.y-10},color);
+    d->AddLine({p.x+18,p.y-38},{p.x+35+swing,p.y-18},color,4);
+    d->AddTriangleFilled({p.x+29+swing,p.y-17},{p.x+41+swing,p.y-17},{p.x+35+swing,p.y-10},color);
   } else if(type==1) {
     d->AddCircleFilled(p,11,color);
     d->AddLine(p,{p.x,p.y-28},color,6);
@@ -41,10 +42,11 @@ void Crane(ImDrawList* d, ImVec2 p, int type, bool busy) {
     d->AddLine({p.x-25,p.y},{p.x-25,p.y-42},color,4);
     d->AddLine({p.x+25,p.y},{p.x+25,p.y-42},color,4);
     d->AddLine({p.x-31,p.y-42},{p.x+31,p.y-42},color,6);
-    d->AddLine({p.x,p.y-42},{p.x,p.y-19},color,2);
-    d->AddRectFilled({p.x-8,p.y-20},{p.x+8,p.y-14},color,2);
+    d->AddLine({p.x+swing,p.y-42},{p.x+swing,p.y-19},color,2);
+    d->AddRectFilled({p.x-8+swing,p.y-20},{p.x+8+swing,p.y-14},color,2);
   }
-  d->AddCircleFilled({p.x-18,p.y+4},4,busy ? IM_COL32(103,230,157,255):IM_COL32(120,132,145,255));
+  const int lampAlpha=busy ? static_cast<int>(210+45*std::sin(time*4.0f)) : 255;
+  d->AddCircleFilled({p.x-18,p.y+4},4,busy ? IM_COL32(103,230,157,lampAlpha):IM_COL32(120,132,145,255));
 }
 }
 void PortView::Reset() { vessels_.clear(); snapshot_.clear(); clock_=0; laneHeight_=170; }
@@ -60,23 +62,59 @@ ImVec2 PortView::Target(const sea_port::ShipView& ship) const {
 }
 void PortView::Update(const sea_port::PortSimulation& simulation, const sea_port::DailyReport& report) {
   snapshot_=simulation.VisualSnapshot();
-  std::array<int,3> counts{};
-  for(const auto& s:snapshot_) if(s.state==sea_port::ShipState::kWaiting) ++counts[static_cast<int>(s.cargo_type)];
-  laneHeight_=std::max(170.0f, 70.0f+58.0f*std::ceil(*std::max_element(counts.begin(),counts.end())/4.0f));
-  auto update=[&](const sea_port::ShipView& data,bool leaving) {
+  // Eight parking icons per type fit the map; the complete queue is in DrawQueues.
+  laneHeight_=170;
+  auto update=[&](const sea_port::ShipView& data,bool leaving, float delay) {
     auto [it,inserted]=vessels_.try_emplace(data.id);
     auto& v=it->second;
-    if(inserted) v.position=leaving && data.berth>=0 ? Target(data):ImVec2(455,65+3*laneHeight_);
-    v.data=data; v.leaving=leaving; v.age=0;
+    if(inserted) v.position=data.berth>=0 ? Target(data):ImVec2(510,65+static_cast<int>(data.cargo_type)*laneHeight_+12);
+    v.data=data; v.leaving=leaving; v.age=0; v.delay=delay;
     ImVec2 target=Target(data);
-    if(leaving) v.route={v.position,{510,v.position.y},{510,85+3*laneHeight_}};
-    else if(Distance(v.position,target)>1) v.route={v.position,{455,v.position.y},{455,target.y},target};
-    else v.route={target};
+    if(leaving) {
+      // The berth approach lies above every moored hull. The channel is shared
+      // by departures in separate time slots, so ships never pass through one another.
+      if(data.berth>=0) v.route={v.position,{v.position.x,65+static_cast<int>(data.cargo_type)*laneHeight_+12},
+                                {510,65+static_cast<int>(data.cargo_type)*laneHeight_+12},{510,85+3*laneHeight_}};
+      else {
+        // Queue exits appear at the clear channel gate instead of crossing
+        // occupied parking rows on the way out.
+        v.position={510,65+static_cast<int>(data.cargo_type)*laneHeight_+12};
+        v.route={v.position,{510,85+3*laneHeight_}};
+      }
+    } else {
+      // The daily model has no continuous positions. Snap state changes to their
+      // reserved parking/berth slot; animate only paths with clear water around them.
+      v.position=target;
+      v.route={target};
+    }
   };
-  for(const auto& s:snapshot_) update(s,false);
-  for(const auto& s:report.departures) update(s,true);
+  for(const auto& s:snapshot_) update(s,false,0);
+  float departureDelay=0;
+  for(const auto& [id,v]:vessels_) {
+    (void)id;
+    if(v.leaving) departureDelay=std::max(departureDelay,v.delay+2.8f-v.age);
+  }
+  for(const auto& s:report.departures) {
+    update(s,true,departureDelay);
+    departureDelay+=2.9f;
+  }
+  for(auto& [id,v]:vessels_) if(v.leaving && v.data.berth>=0) {
+    const bool reused=std::any_of(snapshot_.begin(),snapshot_.end(),[&](const auto& s){
+      return s.id!=id && s.cargo_type==v.data.cargo_type && s.berth==v.data.berth;
+    });
+    if(reused && v.age<v.delay) {
+      const float lane=65+static_cast<int>(v.data.cargo_type)*laneHeight_+12;
+      v.position={510,lane};
+      v.route={v.position,{510,85+3*laneHeight_}};
+    }
+  }
+  // A ship that left an earlier report must not be brought back by a stale sprite.
+  for(auto it=vessels_.begin();it!=vessels_.end();) {
+    const bool active=std::any_of(snapshot_.begin(),snapshot_.end(),[&](const auto& s){return s.id==it->first;});
+    if(!active && !it->second.leaving) it=vessels_.erase(it); else ++it;
+  }
 }
-void PortView::Draw(const sea_port::PortSimulation& simulation,float delta) {
+void PortView::Draw(const sea_port::PortSimulation& simulation,float delta,float maxHeight) {
   clock_+=delta;
   const auto& config=simulation.config();
   int slots=1;
@@ -85,8 +123,9 @@ void PortView::Draw(const sea_port::PortSimulation& simulation,float delta) {
   const float height=110+3*laneHeight_;
   ImGui::TextUnformatted("PORT MAP  |  grey ships / cargo colours / green lamp = assigned crane");
   ImGui::TextDisabled("Daily model: movements illustrate state changes. Hover a ship for cargo and status.");
-  const float scale = std::clamp((ImGui::GetContentRegionAvail().x-40)/width_, 0.45f, 1.0f);
-  ImGui::BeginChild("PortMap",ImVec2(0,std::min(540.0f,height*scale+42)),true,ImGuiWindowFlags_HorizontalScrollbar);
+  const float scale = std::clamp(std::min((ImGui::GetContentRegionAvail().x-32)/width_,
+                                        (maxHeight-78)/height),0.05f,1.0f);
+  ImGui::BeginChild("PortMap",ImVec2(0,height*scale+16),true,ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse);
   ImVec2 origin=ImGui::GetCursorScreenPos();
   ImGui::InvisibleButton("canvas",{width_*scale,height*scale});
   auto* d=ImGui::GetWindowDrawList();
@@ -97,8 +136,9 @@ void PortView::Draw(const sea_port::PortSimulation& simulation,float delta) {
   auto point=[&](float x,float y){return Plus(origin,{x,y});};
   d->AddRectFilled(origin,point(width_,height),IM_COL32(22,77,112,255),10);
   for(float y=24;y<height;y+=33) for(float x=15;x<width_;x+=65) {
-    float shift=std::sin(clock_*.5f+y)*4;
-    d->AddLine(point(x+shift,y),point(x+22+shift,y),IM_COL32(76,142,175,65),1);
+    float shift=std::sin(clock_*.8f+y*.12f+x*.03f)*6;
+    d->AddLine(point(x+shift,y),point(x+22+shift,y),IM_COL32(108,188,211,80),1.5f);
+    d->AddLine(point(x+25+shift,y+4),point(x+40+shift,y+4),IM_COL32(113,198,222,42),1);
   }
   d->AddRectFilled(point(10,10),point(405,height-12),IM_COL32(15,48,74,160),8);
   d->AddText(point(25,23),ink,"ANCHORAGE / WAITING PARKING");
@@ -109,7 +149,8 @@ void PortView::Draw(const sea_port::PortSimulation& simulation,float delta) {
     float y=65+type*laneHeight_;
     int waiting=0;
     for(const auto& s:snapshot_) if(static_cast<int>(s.cargo_type)==type && s.state==sea_port::ShipState::kWaiting) ++waiting;
-    std::string label=std::string(names[type])+"  |  waiting "+std::to_string(waiting);
+    std::string label=std::string(names[type])+"  |  waiting "+std::to_string(waiting)
+        +(waiting>8 ? " (8 shown)" : "");
     d->AddText(point(25,y-9),accents[type],label.c_str());
     d->AddRectFilled(point(565,y+95),point(width_-15,y+133),IM_COL32(111,125,132,255),4);
     d->AddLine(point(565,y+95),point(width_-15,y+95),IM_COL32(223,206,140,255),3);
@@ -122,7 +163,7 @@ void PortView::Draw(const sea_port::PortSimulation& simulation,float delta) {
     }
     for(int i=0;i<config.crane_counts[type];++i) {
       bool busy=std::any_of(snapshot_.begin(),snapshot_.end(),[&](const auto& s){return static_cast<int>(s.cargo_type)==type && s.berth==i;});
-      Crane(d,point(620+i*110.0f,y+108),type,busy);
+      Crane(d,point(620+i*110.0f,y+108),type,busy,clock_);
     }
     if(config.unloading_places[type]==0 || config.crane_counts[type]==0)
       d->AddText(point(610,y+55),ink,"No service: add berths and cranes");
@@ -131,11 +172,22 @@ void PortView::Draw(const sea_port::PortSimulation& simulation,float delta) {
   for(auto it=vessels_.begin();it!=vessels_.end();) {
     auto& v=it->second;
     v.age+=delta;
-    if(v.leaving && v.age>=3.5f) {it=vessels_.erase(it);continue;}
+    if(v.leaving && v.age>=v.delay+2.8f) {it=vessels_.erase(it);continue;}
+    if(v.leaving && v.age<v.delay) {++it;continue;}
+    if(!v.leaving && v.data.state==sea_port::ShipState::kWaiting) {
+      int index=0;
+      for(const auto& s:snapshot_) {
+        if(s.id==v.data.id) break;
+        if(s.cargo_type==v.data.cargo_type && s.state==sea_port::ShipState::kWaiting) ++index;
+      }
+      if(index>=8) {++it;continue;}
+    }
     if(v.route.size()>1) {
       float total=0;
       for(std::size_t i=1;i<v.route.size();++i) total+=Distance(v.route[i-1],v.route[i]);
-      float travelled=std::min(v.age/2.8f,1.0f)*total;
+      const float progress=std::clamp((v.age-v.delay)/2.5f,0.0f,1.0f);
+      const float eased=progress*progress*(3.0f-2.0f*progress);
+      float travelled=eased*total;
       v.position=v.route.back();
       for(std::size_t i=1;i<v.route.size();++i) {
         float length=Distance(v.route[i-1],v.route[i]);
@@ -146,7 +198,12 @@ void PortView::Draw(const sea_port::PortSimulation& simulation,float delta) {
         travelled-=length;
       }
     }
-    ImVec2 p=Plus(origin,v.position);
+    ImVec2 p=Plus(origin,{v.position.x,v.position.y+std::sin(clock_*2.1f+static_cast<float>(it->first%17))*1.4f});
+    if(v.leaving) {
+      const float wake=12.0f+4.0f*std::sin(clock_*5.0f);
+      d->AddLine({p.x-36,p.y-5},{p.x-36-wake,p.y-10},IM_COL32(180,229,246,125),2);
+      d->AddLine({p.x-36,p.y+5},{p.x-36-wake,p.y+10},IM_COL32(180,229,246,125),2);
+    }
     Ship(d,p,static_cast<int>(v.data.cargo_type),v.leaving);
     std::string title=v.data.name.substr(0,13);
     d->AddText({p.x-32,p.y+18},ink,title.c_str());
@@ -176,6 +233,9 @@ void PortView::Draw(const sea_port::PortSimulation& simulation,float delta) {
         std::min(origin.x+width_*scale,clipMax.x),std::min(origin.y+height*scale,clipMax.y));
   d->PopClipRect();
   ImGui::EndChild();
+}
+void PortView::DrawQueues(const sea_port::PortSimulation& simulation) {
+  const auto& config=simulation.config();
   ImGui::Text("WAITING QUEUE  %zu / %zu places",simulation.waiting_ship_count(),config.waiting_capacity);
   if(ImGui::BeginTable("VisualQueues",3,ImGuiTableFlags_BordersInnerV|ImGuiTableFlags_SizingStretchSame)) {
     for(int type=0;type<3;++type) {

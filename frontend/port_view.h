@@ -8,13 +8,15 @@ class PortView {
  public:
   void Reset();
   void Update(const sea_port::PortSimulation& simulation, const sea_port::DailyReport& report);
-  void Draw(const sea_port::PortSimulation& simulation, float delta);
+  void Draw(const sea_port::PortSimulation& simulation, float delta, float maxHeight);
+  void DrawQueues(const sea_port::PortSimulation& simulation);
  private:
   struct Vessel {
     sea_port::ShipView data;
     ImVec2 position{};
     std::vector<ImVec2> route;
     float age = 0;
+    float delay = 0;
     bool leaving = false;
   };
   std::map<std::uint64_t, Vessel> vessels_;

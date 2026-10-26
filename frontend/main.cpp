@@ -230,7 +230,6 @@ int main() {
 
   double lastStepTime = 0.0;
   float speed = 1.0f;
-  float animationBudget = 0;
   PortView portView;
   int waitingCapacity = 20;
   int berthCounts[3] = {4, 3, 3};
@@ -290,6 +289,15 @@ int main() {
     ImGui::SetWindowFontScale(1.0f);
     ImGui::Separator();
     ImGui::Spacing();
+
+    if (simulationStarted && simulation) {
+      const float visualDelta = std::min(io.DeltaTime, 0.1f) * speed;
+      const float mapHeight = std::clamp(io.DisplaySize.y * 0.48f, 240.0f, 530.0f);
+      portView.Draw(*simulation, visualDelta, mapHeight);
+    }
+    // The port map stays in the fixed area. Only controls and reports scroll.
+    ImGui::BeginChild("ScrollableDetails", ImVec2(0, 0), false,
+                      ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
     if (!simulationStarted) {
       ImGui::Text("SIMULATION SETTINGS");
@@ -467,7 +475,6 @@ int main() {
         }
 
         portView.Reset();
-        animationBudget = 0;
         runtimeLog << "START cranes=" << cranesType1 << ',' << cranesType2 << ',' << cranesType3
                    << " berths=" << berthCounts[0] << ',' << berthCounts[1] << ',' << berthCounts[2]
                    << " waiting_capacity=" << waitingCapacity << " random=" << randomTraffic << '\n';
@@ -498,7 +505,6 @@ int main() {
       if (!simulationFinished) {
         if (ImGui::Button("STEP", ImVec2(100, 38))) {
           advanceRequested = true;
-          animationBudget = 3.5f;
           isRunning = false;
         }
         ImGui::SameLine();
@@ -509,7 +515,6 @@ int main() {
         ImGui::SameLine();
         if (ImGui::Button("STOP", ImVec2(100, 38))) {
           isRunning = false;
-          animationBudget = 0;
         }
         ImGui::SameLine();
         if (ImGui::Button("FINISH SIMULATION", ImVec2(200, 38))) {
@@ -527,9 +532,7 @@ int main() {
       if (hasReport) ImGui::Text("Waiting %zu | Unloading %zu | Completed %d | Waves %d | Operability %.0f%%",
           lastReport.waiting, lastReport.unloading, simulation->statistics().completed_ships(),
           lastReport.weather.wave_level, lastReport.weather.operability * 100);
-      const float visualDelta = (isRunning || animationBudget > 0) ? std::min(io.DeltaTime, 0.1f) * speed : 0;
-      animationBudget = std::max(0.0f, animationBudget - visualDelta);
-      portView.Draw(*simulation, visualDelta);
+      portView.DrawQueues(*simulation);
       if (ImGui::CollapsingHeader("Reports, events and completed unloadings")) {
       if (hasReport) {
         ImGui::Text("DAILY REPORT");
@@ -658,6 +661,7 @@ int main() {
       portView.Reset();
       runtimeLog << "Returned to settings\n";
     }
+    ImGui::EndChild();
     ImGui::End();
 
     if (simulation && !simulationFinished) {
@@ -685,7 +689,6 @@ int main() {
         }
         lastReport = simulation->SimulateDay();
         portView.Update(*simulation, lastReport);
-        animationBudget = 3.5f;
         runtimeLog << "day=" << day << " arrived=" << lastReport.arrived
                    << " waiting=" << lastReport.waiting << " unloading=" << lastReport.unloading
                    << " completed=" << lastReport.completed << " rejected=" << lastReport.rejected
