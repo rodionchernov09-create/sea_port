@@ -44,5 +44,23 @@ int main() {
   ship.name = "early"; ship.booking_day = 1; ship.planned_arrival_day = 3;
   early.ScheduleShip(ship);
   check(early.SimulateDay().arrived == 1, "manual advance booking must allow early arrival");
+  SimulationConfig parallel_config;
+  parallel_config.current_day_arrival_rate = 0;
+  parallel_config.crane_counts = {2, 0, 0};
+  parallel_config.unloading_places = {2, 0, 0};
+  parallel_config.arrival_deviation_min_days = parallel_config.arrival_deviation_max_days = 0;
+  parallel_config.unloading_delay_min_days = parallel_config.unloading_delay_max_days = 0;
+  PortSimulation parallel(parallel_config);
+  ShipSpec first; first.name = "first"; first.cargo_weight_tons = 100;
+  ShipSpec second = first; second.name = "second";
+  const auto first_id = parallel.ScheduleShip(first);
+  const auto second_id = parallel.ScheduleShip(second);
+  parallel.SetWeather(1, Weather{0, 1.0, false});
+  const auto simultaneous = parallel.SimulateDay();
+  check(simultaneous.departures.size() == 2, "both parallel ships must depart");
+  check(simultaneous.departures[0].id == first_id && simultaneous.departures[0].berth == 0,
+        "first departure must retain its distinct berth and identity");
+  check(simultaneous.departures[1].id == second_id && simultaneous.departures[1].berth == 1,
+        "second departure must retain its distinct berth and identity");
   std::cout << "Integration checks passed: cargo types, weather, queues, rejection, abandonment, statistics\n";
 }
