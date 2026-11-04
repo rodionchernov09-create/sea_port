@@ -23,6 +23,12 @@ Seaport
 ```
 
 `Seaport` при необходимости пересобирает GUI и открывает окно из папки проекта.
+Чтобы открыть исходники проекта в Zed:
+
+```bash
+ln -s "$(pwd)/scripts/project_seaport" "$HOME/.local/bin/project_seaport"
+project_seaport
+```
 
 Режимы запуска:
 
@@ -65,6 +71,7 @@ Seaport
 - [Правила симуляции и формулы](docs/simulation_rules.md)
 - [Публичный API](docs/api.md)
 - [Подробное руководство по бэкенду и фронтенду](docs/PROJECT_GUIDE.md)
+- [То же руководство в DOCX](docs/PROJECT_GUIDE.docx)
 - [План и состояние реализации](PLAN.md)
 # sea_port
 
