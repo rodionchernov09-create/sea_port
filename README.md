@@ -14,6 +14,16 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 ```
 
+Для короткой команды в терминале добавьте скрипт в `~/.local/bin` (каталог
+должен быть в `PATH`):
+
+```bash
+ln -s "$(pwd)/scripts/Seaport" "$HOME/.local/bin/Seaport"
+Seaport
+```
+
+`Seaport` при необходимости пересобирает GUI и открывает окно из папки проекта.
+
 Режимы запуска:
 
 ```bash

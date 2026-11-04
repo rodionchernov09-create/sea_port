@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_path=$(readlink -f -- "${BASH_SOURCE[0]}")
+project_dir=$(dirname -- "$(dirname -- "$script_path")")
+cd "$project_dir"
+
+cmake -S . -B build -DSEA_PORT_BUILD_GUI=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build build --target sea_port_gui --parallel 4
+
+exec "$project_dir/build/sea_port_gui"
