@@ -230,6 +230,7 @@ int main() {
 
   double lastStepTime = 0.0;
   float speed = 1.0f;
+  int pendingStepDays = 0;
   PortView portView;
   int waitingCapacity = 20;
   int berthCounts[3] = {4, 3, 3};
@@ -272,7 +273,6 @@ int main() {
     glfwPollEvents();
 
     bool startRequested = false;
-    bool advanceRequested = false;
     bool finishRequested = false;
 
     ImGui_ImplOpenGL3_NewFrame();
@@ -482,6 +482,7 @@ int main() {
         simulationStarted = true;
         simulationFinished = false;
         isRunning = smoke;
+        pendingStepDays = 0;
         hasReport = false;
         lastStepTime = glfwGetTime();
       }
@@ -504,22 +505,25 @@ int main() {
 
       if (!simulationFinished) {
         if (ImGui::Button("STEP", ImVec2(100, 38))) {
-          advanceRequested = true;
+          pendingStepDays = simulationStep;
           isRunning = false;
         }
         ImGui::SameLine();
         if (ImGui::Button("RUN", ImVec2(100, 38))) {
+          pendingStepDays = 0;
           isRunning = true;
           lastStepTime = glfwGetTime();
         }
         ImGui::SameLine();
         if (ImGui::Button("STOP", ImVec2(100, 38))) {
           isRunning = false;
+          pendingStepDays = 0;
         }
         ImGui::SameLine();
         if (ImGui::Button("FINISH SIMULATION", ImVec2(200, 38))) {
           finishRequested = true;
           isRunning = false;
+          pendingStepDays = 0;
         }
       } else {
         ImGui::Text("SIMULATION FINISHED");
@@ -656,7 +660,8 @@ int main() {
       simulationStarted = false;
       simulationFinished = false;
       isRunning = false;
-      advanceRequested = finishRequested = false;
+      finishRequested = false;
+      pendingStepDays = 0;
       simulation.reset();
       portView.Reset();
       runtimeLog << "Returned to settings\n";
@@ -668,9 +673,11 @@ int main() {
       int daysToRun = 0;
       if (finishRequested) {
         daysToRun = simulation->config().simulation_days - simulation->current_day() + 1;
-      } else if (advanceRequested) {
-        daysToRun = simulationStep;
-      } else if (isRunning && glfwGetTime() - lastStepTime >= (4.0 / speed)) {
+      } else if (!portView.IsAnimating() && pendingStepDays > 0) {
+        daysToRun = 1;
+        --pendingStepDays;
+      } else if (!portView.IsAnimating() && isRunning &&
+                 glfwGetTime() - lastStepTime >= (4.0 / speed)) {
         daysToRun = 1;
         lastStepTime = glfwGetTime();
       }
@@ -688,7 +695,7 @@ int main() {
           simulation->SetWeather(day, planned->weather);
         }
         lastReport = simulation->SimulateDay();
-        portView.Update(*simulation, lastReport);
+        if (!finishRequested) portView.Update(*simulation, lastReport);
         runtimeLog << "day=" << day << " arrived=" << lastReport.arrived
                    << " waiting=" << lastReport.waiting << " unloading=" << lastReport.unloading
                    << " completed=" << lastReport.completed << " rejected=" << lastReport.rejected
@@ -701,6 +708,7 @@ int main() {
 
       if (simulation->current_day() > simulation->config().simulation_days || finishRequested) {
         simulation->Finalize();
+        if (finishRequested) portView.Sync(*simulation);
         simulationFinished = true;
         isRunning = false;
       }

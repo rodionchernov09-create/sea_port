@@ -8,6 +8,9 @@ namespace {
 constexpr ImU32 ink = IM_COL32(222, 237, 247, 255);
 const std::array<ImU32, 3> accents = {IM_COL32(245,193,95,255), IM_COL32(104,218,206,255), IM_COL32(179,157,245,255)};
 const char* names[] = {"BULK / grab cranes", "LIQUID / loading arms", "CONTAINERS / gantry cranes"};
+constexpr float kMinMotionSeconds = 1.2f;
+constexpr float kMaxMotionSeconds = 2.8f;
+constexpr float kMotionGap = 0.12f;
 ImVec2 Plus(ImVec2 a, ImVec2 b) { return {a.x+b.x,a.y+b.y}; }
 float Distance(ImVec2 a, ImVec2 b) { return std::hypot(a.x-b.x,a.y-b.y); }
 void Ship(ImDrawList* d, ImVec2 p, int type, bool leaving) {
@@ -62,57 +65,113 @@ ImVec2 PortView::Target(const sea_port::ShipView& ship) const {
 }
 void PortView::Update(const sea_port::PortSimulation& simulation, const sea_port::DailyReport& report) {
   snapshot_=simulation.VisualSnapshot();
-  // Eight parking icons per type fit the map; the complete queue is in DrawQueues.
   laneHeight_=170;
-  auto update=[&](const sea_port::ShipView& data,bool leaving, float delay) {
-    auto [it,inserted]=vessels_.try_emplace(data.id);
-    auto& v=it->second;
-    if(inserted) v.position=data.berth>=0 ? Target(data):ImVec2(510,65+static_cast<int>(data.cargo_type)*laneHeight_+12);
-    v.data=data; v.leaving=leaving; v.age=0; v.delay=delay;
-    ImVec2 target=Target(data);
-    if(leaving) {
-      // The berth approach lies above every moored hull. The channel is shared
-      // by departures in separate time slots, so ships never pass through one another.
-      if(data.berth>=0) v.route={v.position,{v.position.x,65+static_cast<int>(data.cargo_type)*laneHeight_+12},
-                                {510,65+static_cast<int>(data.cargo_type)*laneHeight_+12},{510,85+3*laneHeight_}};
-      else {
-        // Queue exits appear at the clear channel gate instead of crossing
-        // occupied parking rows on the way out.
-        v.position={510,65+static_cast<int>(data.cargo_type)*laneHeight_+12};
-        v.route={v.position,{510,85+3*laneHeight_}};
-      }
-    } else {
-      // The daily model has no continuous positions. Snap state changes to their
-      // reserved parking/berth slot; animate only paths with clear water around them.
-      v.position=target;
-      v.route={target};
-    }
+  float nextSlot=0;
+  auto schedule=[&](Vessel& v, const sea_port::ShipView& data,
+                    std::vector<ImVec2> route, bool leaving, bool appearing) {
+    v.data=data; v.position=route.front(); v.route=std::move(route);
+    v.leaving=leaving; v.appearing=appearing; v.age=0; v.delay=nextSlot;
+    float length=0;
+    for(std::size_t i=1;i<v.route.size();++i)
+      length+=Distance(v.route[i-1],v.route[i]);
+    v.duration=v.route.size()>1 ? std::clamp(length/500.0f,kMinMotionSeconds,kMaxMotionSeconds):0;
+    if(v.duration>0) nextSlot+=v.duration+kMotionGap;
   };
-  for(const auto& s:snapshot_) update(s,false,0);
-  float departureDelay=0;
-  for(const auto& [id,v]:vessels_) {
-    (void)id;
-    if(v.leaving) departureDelay=std::max(departureDelay,v.delay+2.8f-v.age);
-  }
+  auto approach=[&](const sea_port::ShipView& s){
+    return 65+static_cast<int>(s.cargo_type)*laneHeight_+12;
+  };
+  auto aisle=[&](const sea_port::ShipView& s){
+    return 65+static_cast<int>(s.cargo_type)*laneHeight_+71;
+  };
+
+  // A tick first clears the old parking and berths, then brings ships in.
+  std::vector<sea_port::ShipView> sameDayCompletions;
   for(const auto& s:report.departures) {
-    update(s,true,departureDelay);
-    departureDelay+=2.9f;
-  }
-  for(auto& [id,v]:vessels_) if(v.leaving && v.data.berth>=0) {
-    const bool reused=std::any_of(snapshot_.begin(),snapshot_.end(),[&](const auto& s){
-      return s.id!=id && s.cargo_type==v.data.cargo_type && s.berth==v.data.berth;
-    });
-    if(reused && v.age<v.delay) {
-      const float lane=65+static_cast<int>(v.data.cargo_type)*laneHeight_+12;
-      v.position={510,lane};
-      v.route={v.position,{510,85+3*laneHeight_}};
+    if(s.state==sea_port::ShipState::kCompleted && !vessels_.contains(s.id)) {
+      sameDayCompletions.push_back(s);
+      continue;
     }
+    auto [it,inserted]=vessels_.try_emplace(s.id);
+    Vessel& v=it->second;
+    const float lane=approach(s);
+    const ImVec2 start=inserted ? ImVec2(455,lane) : v.position;
+    std::vector<ImVec2> route;
+    if(!inserted && v.data.state==sea_port::ShipState::kWaiting) {
+      route={start,{start.x,aisle(s)},{455,aisle(s)},{455,lane},{510,lane},{510,85+3*laneHeight_}};
+    } else if(!inserted && v.data.state==sea_port::ShipState::kUnloading) {
+      route={start,{start.x,lane},{510,lane},{510,85+3*laneHeight_}};
+    } else {
+      route={start,{510,lane},{510,85+3*laneHeight_}};
+    }
+    schedule(v,s,std::move(route),true,inserted);
   }
-  // A ship that left an earlier report must not be brought back by a stale sprite.
+
+  auto updateActive=[&](const sea_port::ShipView& s) {
+    auto [it,inserted]=vessels_.try_emplace(s.id);
+    Vessel& v=it->second;
+    const ImVec2 target=Target(s);
+    const float lane=approach(s);
+    const ImVec2 start=inserted ? ImVec2(455,lane) : v.position;
+    if(!inserted && Distance(start,target)<1) {
+      v.data=s; v.route={target}; v.position=target; v.duration=0; v.appearing=false; return;
+    }
+    std::vector<ImVec2> route;
+    if(!inserted && v.data.state==sea_port::ShipState::kWaiting)
+      route={start,{start.x,aisle(s)},{455,aisle(s)},{455,lane},{target.x,lane},target};
+    else
+      route={start,{455,lane},{target.x,lane},target};
+    schedule(v,s,std::move(route),false,inserted);
+  };
+  for(const auto& s:snapshot_)
+    if(s.state==sea_port::ShipState::kUnloading) updateActive(s);
+
+  // Existing queue members fill vacated slots before new arrivals enter.
+  auto updateWaiting=[&](const sea_port::ShipView& s, bool newlyArrived) {
+    auto [it,inserted]=vessels_.try_emplace(s.id);
+    Vessel& v=it->second;
+    const ImVec2 target=Target(s);
+    const ImVec2 start=inserted ? ImVec2(455,aisle(s)) : v.position;
+    if(!inserted && Distance(start,target)<1) {
+      v.data=s; v.route={target}; v.position=target; v.duration=0; v.appearing=false; return;
+    }
+    std::vector<ImVec2> route;
+    if(newlyArrived) route={start,{target.x,aisle(s)},target};
+    else route={start,{start.x,aisle(s)},{target.x,aisle(s)},target};
+    schedule(v,s,std::move(route),false,inserted);
+  };
+  for(const auto& s:snapshot_)
+    if(s.state==sea_port::ShipState::kWaiting && vessels_.contains(s.id)) updateWaiting(s,false);
+  for(const auto& s:snapshot_)
+    if(s.state==sea_port::ShipState::kWaiting && !vessels_.contains(s.id)) updateWaiting(s,true);
+
+  // A ship that arrived and finished within one model day was absent from the
+  // previous frame. Show its approach and departure as one continuous route.
+  for(const auto& s:sameDayCompletions) {
+    auto& v=vessels_[s.id];
+    const float lane=approach(s);
+    const ImVec2 berth=Target(s);
+    schedule(v,s,{{455,lane},{berth.x,lane},berth,{berth.x,lane},
+                  {510,lane},{510,85+3*laneHeight_}},true,true);
+  }
+
   for(auto it=vessels_.begin();it!=vessels_.end();) {
     const bool active=std::any_of(snapshot_.begin(),snapshot_.end(),[&](const auto& s){return s.id==it->first;});
     if(!active && !it->second.leaving) it=vessels_.erase(it); else ++it;
   }
+}
+void PortView::Sync(const sea_port::PortSimulation& simulation) {
+  Reset();
+  snapshot_=simulation.VisualSnapshot();
+  for(const auto& s:snapshot_) {
+    auto& v=vessels_[s.id];
+    v.data=s; v.position=Target(s); v.route={v.position};
+  }
+}
+bool PortView::IsAnimating() const {
+  return std::any_of(vessels_.begin(),vessels_.end(),[](const auto& item){
+    const Vessel& v=item.second;
+    return v.duration>0 && v.age<v.delay+v.duration;
+  });
 }
 void PortView::Draw(const sea_port::PortSimulation& simulation,float delta,float maxHeight) {
   clock_+=delta;
@@ -172,8 +231,8 @@ void PortView::Draw(const sea_port::PortSimulation& simulation,float delta,float
   for(auto it=vessels_.begin();it!=vessels_.end();) {
     auto& v=it->second;
     v.age+=delta;
-    if(v.leaving && v.age>=v.delay+2.8f) {it=vessels_.erase(it);continue;}
-    if(v.leaving && v.age<v.delay) {++it;continue;}
+    if(v.leaving && v.age>=v.delay+v.duration) {it=vessels_.erase(it);continue;}
+    if(v.appearing && v.age<v.delay) {++it;continue;}
     if(!v.leaving && v.data.state==sea_port::ShipState::kWaiting) {
       int index=0;
       for(const auto& s:snapshot_) {
@@ -185,7 +244,7 @@ void PortView::Draw(const sea_port::PortSimulation& simulation,float delta,float
     if(v.route.size()>1) {
       float total=0;
       for(std::size_t i=1;i<v.route.size();++i) total+=Distance(v.route[i-1],v.route[i]);
-      const float progress=std::clamp((v.age-v.delay)/2.5f,0.0f,1.0f);
+      const float progress=std::clamp((v.age-v.delay)/v.duration,0.0f,1.0f);
       const float eased=progress*progress*(3.0f-2.0f*progress);
       float travelled=eased*total;
       v.position=v.route.back();
