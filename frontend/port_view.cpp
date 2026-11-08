@@ -265,7 +265,7 @@ void PortView::Draw(const sea_port::PortSimulation& simulation,float delta,float
     }
     Ship(d,p,static_cast<int>(v.data.cargo_type),v.leaving);
     std::string title=v.data.name.substr(0,13);
-    d->AddText({p.x-32,p.y+18},ink,title.c_str());
+    d->AddText(ImGui::GetFont(), 18.0f, {p.x-32,p.y+18},ink,title.c_str());
     if(v.data.state==sea_port::ShipState::kUnloading) {
       float fraction=static_cast<float>(1-v.data.remaining_tons/std::max(1.0,v.data.total_tons));
       d->AddRectFilled({p.x-30,p.y-22},{p.x+30,p.y-18},IM_COL32(30,48,60,255),2);

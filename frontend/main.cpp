@@ -292,7 +292,7 @@ int main() {
 
     if (simulationStarted && simulation) {
       const float visualDelta = std::min(io.DeltaTime, 0.1f) * speed;
-      const float mapHeight = std::clamp(io.DisplaySize.y * 0.48f, 240.0f, 530.0f);
+      const float mapHeight = std::clamp(io.DisplaySize.y * 0.70f, 380.0f, 680.0f);
       portView.Draw(*simulation, visualDelta, mapHeight);
     }
     // The port map stays in the fixed area. Only controls and reports scroll.
