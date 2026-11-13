@@ -57,7 +57,7 @@ struct SimulationConfig {
   double minimum_rating_for_optimization = 70.0;
   double minimum_service_rate_for_optimization = 0.35;
 
-  std::array<double, kCargoTypeCount> crane_purchase_cost = {600000.0, 900000.0, 1200000.0};
+  std::array<double, kCargoTypeCount> crane_purchase_cost = {400000.0, 600000.0, 800000.0};
   std::uint64_t random_seed = 5489U;
 };
 

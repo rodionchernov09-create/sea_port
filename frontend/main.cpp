@@ -13,6 +13,7 @@
 #include "port_view.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "sea_port/cargo.h"
 #include "sea_port/port_simulation.h"
 #include "sea_port/types.h"
 
@@ -47,6 +48,35 @@ const char* WeatherName(const sea_port::Weather& weather) {
   if (weather.wave_level == 2) return "Moderate waves";
   if (weather.wave_level == 1) return "Small waves";
   return "Calm sea";
+}
+
+void DrawPriceList(const sea_port::SimulationConfig& config) {
+  const std::array<double, sea_port::kCargoTypeCount> revenuePerTon = {
+      sea_port::GrainCargo(1.0).revenue_per_ton(),
+      sea_port::OilCargo(1.0).revenue_per_ton(),
+      sea_port::ContainerCargo(1.0).revenue_per_ton()};
+  const char* cargoNames[] = {"Bulk / grain", "Liquid / oil", "Container"};
+
+  ImGui::Text("PRICES (currency units)");
+  if (ImGui::BeginTable("PriceList", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+    ImGui::TableSetupColumn("Cargo type");
+    ImGui::TableSetupColumn("Crane / unit");
+    ImGui::TableSetupColumn("Berth / unit");
+    ImGui::TableSetupColumn("Cargo / ton (base)");
+    ImGui::TableHeadersRow();
+    for (std::size_t index = 0; index < sea_port::kCargoTypeCount; ++index) {
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn();
+      ImGui::TextUnformatted(cargoNames[index]);
+      ImGui::TableNextColumn();
+      ImGui::Text("%.0f", config.crane_purchase_cost[index]);
+      ImGui::TableNextColumn();
+      ImGui::TextUnformatted("Not charged");
+      ImGui::TableNextColumn();
+      ImGui::Text("%.0f", revenuePerTon[index]);
+    }
+    ImGui::EndTable();
+  }
 }
 
 void DrawWeatherList(const std::vector<PlannedWeather>& weatherPlan) {
@@ -351,6 +381,8 @@ int main() {
       ImGui::SliderInt("Simulation step (days)", &simulationStep, 1, 3);
 
       ImGui::EndChild();
+      ImGui::Spacing();
+      DrawPriceList(sea_port::SimulationConfig{});
 
       ImGui::Spacing();
       ImGui::Text("SHIP ARRIVAL SCHEDULE");
