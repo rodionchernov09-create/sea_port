@@ -1,9 +1,0 @@
-[ 33%] Built target sea_port_lib
-[ 81%] Built target glfw
-[ 85%] Building CXX object CMakeFiles/integration_test.dir/tests/integration_test.cpp.o
-[ 85%] Built target sea_port
-[ 86%] Building CXX object CMakeFiles/sea_port_gui.dir/frontend/main.cpp.o
-[ 88%] Linking CXX executable integration_test
-[ 88%] Built target integration_test
-[ 89%] Linking CXX executable sea_port_gui
-[100%] Built target sea_port_gui
